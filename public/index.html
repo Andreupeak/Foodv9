@@ -7,6 +7,7 @@
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#0f172a">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
@@ -14,17 +15,11 @@
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        /* Dark Mode Conic Gradient */
         .conic-gradient { background: conic-gradient(var(--color) var(--percent), #1e293b 0); }
-        .input-dark { width: 100%; background: #1e293b; border: 1px solid #334155; padding: 10px; border-radius: 8px; color: white; margin-top: 4px; outline: none; }
-        .input-dark:focus { border-color: #34d399; }
-        .view-section { display: none; }
-        .view-section.active { display: block; }
-        
-        /* Robust Scanner Styling */
-        #scanner-wrapper { position: relative; width: 100%; border-radius: 12px; overflow: hidden; background: #000; margin-bottom: 12px; display: none; }
-        #scanner-container { width: 100%; }
-        #scanner-container video { object-fit: cover; border-radius: 12px; }
-        .scan-overlay { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6); color: white; padding: 4px 8px; border-radius: 4px; font-size: 10px; z-index: 10; }
+        .modal-enter { transform: translateY(100%); }
+        .modal-enter-active { transform: translateY(0); transition: transform 0.3s ease-out; }
+        .modal-exit { transform: translateY(100%); transition: transform 0.3s ease-in; }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100 h-screen flex flex-col overflow-hidden">
@@ -33,66 +28,70 @@
     <header class="bg-slate-900 border-b border-slate-800 p-4 z-10 flex justify-between items-center">
         <div>
             <h1 class="text-xl font-bold tracking-tight text-emerald-400">FoodLog Pro</h1>
-            <div id="headerDate" class="text-xs text-slate-400 font-medium mt-0.5">Today</div>
+            <div id="currentDateDisplay" class="text-xs text-slate-400 font-medium mt-0.5">Today</div>
         </div>
         <div class="flex gap-3">
             <button onclick="changeDate(-1)" class="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-300"><i class="fa-solid fa-chevron-left"></i></button>
             <button onclick="changeDate(1)" class="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-300"><i class="fa-solid fa-chevron-right"></i></button>
-            <button onclick="openProfile()" class="w-8 h-8 rounded-full bg-emerald-900/50 text-emerald-400 border border-emerald-800"><i class="fa-solid fa-user"></i></button>
+            <button onclick="openProfile()" class="w-8 h-8 rounded-full bg-emerald-900/50 text-emerald-400 flex items-center justify-center border border-emerald-800"><i class="fa-solid fa-user"></i></button>
         </div>
     </header>
 
-    <!-- MAIN CONTAINER -->
-    <main class="flex-1 overflow-y-auto p-4 pb-24 hide-scrollbar">
+    <!-- MAIN SCROLL VIEW -->
+    <main class="flex-1 overflow-y-auto p-4 pb-24 hide-scrollbar" id="main-view">
         
-        <!-- DIARY -->
-        <div id="view-diary" class="view-section active">
-            <div class="bg-slate-900 rounded-2xl p-5 mb-4 border border-slate-800 relative">
-                <button onclick="openMicros()" class="absolute top-4 right-4 text-xs text-emerald-400 bg-emerald-950 px-2 py-1 rounded border border-emerald-900"><i class="fa-solid fa-vial"></i> Micros</button>
-                <div class="flex items-center">
-                    <div class="relative w-28 h-28 rounded-full conic-gradient flex items-center justify-center shadow-lg" id="calCircle" style="--color: #34d399; --percent: 0%;">
-                        <div class="w-24 h-24 bg-slate-900 rounded-full flex flex-col items-center justify-center border-4 border-slate-900">
-                            <span class="text-[10px] text-slate-500 uppercase font-bold">Left</span>
-                            <span class="text-2xl font-bold text-white" id="calRemaining">--</span>
-                        </div>
+        <!-- DASHBOARD / CIRCLE -->
+        <div class="bg-slate-900 rounded-2xl p-5 mb-5 border border-slate-800 relative">
+            <button onclick="openMicros()" class="absolute top-4 right-4 text-xs text-emerald-400 bg-emerald-950 px-2 py-1 rounded border border-emerald-900">
+                <i class="fa-solid fa-vial"></i> Micros
+            </button>
+
+            <div class="flex items-center">
+                <div class="relative w-28 h-28 rounded-full conic-gradient flex items-center justify-center shadow-2xl shadow-emerald-900/20" id="calCircle" style="--color: #34d399; --percent: 0%;">
+                    <div class="w-24 h-24 bg-slate-900 rounded-full flex flex-col items-center justify-center border-4 border-slate-900">
+                        <span class="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Remaining</span>
+                        <span class="text-2xl font-bold text-white" id="calRemaining">--</span>
+                        <span class="text-[10px] text-slate-500">kcal</span>
                     </div>
-                    <div class="flex-1 ml-6 space-y-3">
-                        <div class="space-y-1"><div class="flex justify-between text-xs text-slate-400"><span>Carbs</span><span id="carbVal">0/0g</span></div><div class="h-1.5 bg-slate-800 rounded-full overflow-hidden"><div id="carbBar" class="h-full bg-blue-500 w-0 transition-all"></div></div></div>
-                        <div class="space-y-1"><div class="flex justify-between text-xs text-slate-400"><span>Protein</span><span id="protVal">0/0g</span></div><div class="h-1.5 bg-slate-800 rounded-full overflow-hidden"><div id="protBar" class="h-full bg-red-500 w-0 transition-all"></div></div></div>
-                        <div class="space-y-1"><div class="flex justify-between text-xs text-slate-400"><span>Fat</span><span id="fatVal">0/0g</span></div><div class="h-1.5 bg-slate-800 rounded-full overflow-hidden"><div id="fatBar" class="h-full bg-yellow-500 w-0 transition-all"></div></div></div>
+                </div>
+                <div class="flex-1 ml-6 space-y-3">
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs text-slate-400"><span>Carbs</span><span id="carbVal">0/0g</span></div>
+                        <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden"><div id="carbBar" class="h-full bg-blue-500 w-0 transition-all duration-500"></div></div>
+                    </div>
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs text-slate-400"><span>Protein</span><span id="protVal">0/0g</span></div>
+                        <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden"><div id="protBar" class="h-full bg-red-500 w-0 transition-all duration-500"></div></div>
+                    </div>
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs text-slate-400"><span>Fat</span><span id="fatVal">0/0g</span></div>
+                        <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden"><div id="fatBar" class="h-full bg-yellow-500 w-0 transition-all duration-500"></div></div>
                     </div>
                 </div>
             </div>
-            <div id="mealsContainer" class="space-y-4"></div>
         </div>
 
-        <!-- PLANNER -->
-        <div id="view-planner" class="view-section">
-            <h2 class="text-xl font-bold mb-4">Smart Meal Planner</h2>
-            <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800">
-                <p class="text-sm text-slate-400 mb-2">Ingredients you have:</p>
-                <textarea id="plannerInput" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white h-24 mb-3" placeholder="e.g. Chicken breast, broccoli, rice..."></textarea>
-                <button onclick="generateMealPlan()" class="w-full py-3 bg-blue-600 rounded-xl font-bold mb-6">Generate Recipe</button>
-                <div id="plannerResult" class="hidden border-t border-slate-800 pt-4">
-                    <h3 id="planTitle" class="font-bold text-lg mb-2 text-white"></h3>
-                    <p id="planRecipe" class="text-sm text-slate-300 mb-4 whitespace-pre-wrap"></p>
-                    <div class="bg-slate-950 p-3 rounded-lg">
-                        <div class="text-xs font-bold text-slate-500 uppercase mb-2">Grocery List</div>
-                        <ul id="planGrocery" class="text-sm space-y-1 list-disc list-inside text-slate-300"></ul>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <!-- MEALS LIST -->
+        <div id="mealsContainer" class="space-y-4"></div>
 
     </main>
 
-    <!-- FAB -->
-    <button id="fabAdd" onclick="openAddModal()" class="absolute bottom-20 right-4 bg-emerald-500 text-white w-14 h-14 rounded-full shadow-lg shadow-emerald-500/30 flex items-center justify-center text-2xl z-20 active:scale-95 transition-transform"><i class="fa-solid fa-plus"></i></button>
+    <!-- FLOATING BUTTON -->
+    <button onclick="openAddModal()" class="absolute bottom-20 right-4 bg-emerald-500 text-white w-14 h-14 rounded-full shadow-lg shadow-emerald-500/30 flex items-center justify-center text-2xl z-20 active:scale-95 transition-transform">
+        <i class="fa-solid fa-plus"></i>
+    </button>
 
-    <!-- NAV -->
+    <!-- BOTTOM NAV -->
     <nav class="bg-slate-900 border-t border-slate-800 flex justify-around py-3 z-30 pb-safe">
-        <button class="nav-btn active flex flex-col items-center text-[10px] gap-1 text-emerald-400" data-target="view-diary" onclick="switchTab('view-diary')"><i class="fa-solid fa-book-open text-xl"></i> Diary</button>
-        <button class="nav-btn flex flex-col items-center text-[10px] gap-1 text-slate-500" data-target="view-planner" onclick="switchTab('view-planner')"><i class="fa-solid fa-carrot text-xl"></i> Planner</button>
+        <button class="nav-item active flex flex-col items-center text-[10px] gap-1 text-emerald-400" onclick="switchView('diary')">
+            <i class="fa-solid fa-book-open text-xl"></i> Diary
+        </button>
+        <button class="nav-item flex flex-col items-center text-[10px] gap-1 text-slate-500" onclick="openPlanner()">
+            <i class="fa-solid fa-carrot text-xl"></i> Planner
+        </button>
+        <button class="nav-item flex flex-col items-center text-[10px] gap-1 text-slate-500" onclick="exportCSV()">
+            <i class="fa-solid fa-file-csv text-xl"></i> Export
+        </button>
     </nav>
 
     <!-- MODAL: ADD FOOD -->
@@ -101,38 +100,35 @@
             <button onclick="closeAddModal()" class="text-slate-400 w-8"><i class="fa-solid fa-chevron-down text-xl"></i></button>
             <div class="flex gap-4 text-sm font-medium">
                 <button onclick="setSearchMode('search')" id="tab-search" class="text-emerald-400 border-b-2 border-emerald-400 pb-1">Search</button>
-                <button onclick="setSearchMode('text')" id="tab-text" class="text-slate-400 pb-1">Text</button>
                 <button onclick="setSearchMode('favs')" id="tab-favs" class="text-slate-400 pb-1">Favorites</button>
             </div>
             <div class="w-8"></div>
         </div>
 
         <div id="view-search" class="flex flex-col flex-1 p-4">
-            <!-- SCANNER CONTAINER -->
-            <div id="scanner-wrapper">
-                <div id="scanner-container"></div>
-                <button onclick="stopScanner()" class="scan-overlay">STOP SCAN</button>
-            </div>
+            <div id="scanner-container" class="mb-4 hidden rounded-lg overflow-hidden relative border border-slate-700 h-64 bg-black"></div>
             
             <div class="relative mb-4">
                 <i class="fa-solid fa-magnifying-glass absolute left-4 top-3.5 text-slate-500"></i>
-                <input type="text" id="searchInput" placeholder="Search (e.g. Mivolis, Big Mac)" class="w-full bg-slate-800 text-white p-3 pl-10 rounded-xl border border-slate-700 outline-none">
-                <!-- BARCODE BUTTON -->
-                <button onclick="startScanner()" class="absolute right-2 top-2 text-slate-300 bg-slate-700 p-2 rounded-lg active:text-emerald-400"><i class="fa-solid fa-barcode"></i></button>
+                <input type="text" id="searchInput" placeholder="Search (e.g., 'Big Mac' or 'Mivolis')" class="w-full bg-slate-800 text-white p-3 pl-10 rounded-xl border border-slate-700 focus:border-emerald-500 outline-none">
+                <button onclick="startScanner()" class="absolute right-3 top-2.5 text-slate-400 bg-slate-700 p-1.5 rounded-lg"><i class="fa-solid fa-barcode"></i></button>
             </div>
-            
-            <div class="grid grid-cols-2 gap-3 mb-4">
-                <button onclick="triggerVision('camera')" class="py-3 bg-slate-800 rounded-xl border border-slate-700 text-slate-300 text-sm font-medium"><i class="fa-solid fa-camera text-emerald-400 mr-2"></i>Snap Pic</button>
-                <button onclick="triggerVision('gallery')" class="py-3 bg-slate-800 rounded-xl border border-slate-700 text-slate-300 text-sm font-medium"><i class="fa-solid fa-image text-blue-400 mr-2"></i>Upload</button>
-            </div>
-            
-            <div id="searchResults" class="flex-1 overflow-y-auto space-y-2"></div>
-        </div>
 
-        <div id="view-text" class="hidden flex-col flex-1 p-4">
-            <p class="text-xs text-slate-400 mb-2">Paste ingredients (e.g. "100g rice, 1 cup dal")</p>
-            <textarea id="multiInput" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white h-32 mb-4" placeholder="Type here..."></textarea>
-            <button onclick="parseTextIngredients()" class="w-full py-3 bg-emerald-600 rounded-xl font-bold">Analyze & Add</button>
+            <div class="grid grid-cols-2 gap-3 mb-4">
+                <button onclick="triggerVision('camera')" class="py-3 bg-slate-800 rounded-xl border border-slate-700 text-slate-300 text-sm font-medium flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-camera text-emerald-400"></i> Camera Scan
+                </button>
+                <button onclick="triggerVision('gallery')" class="py-3 bg-slate-800 rounded-xl border border-slate-700 text-slate-300 text-sm font-medium flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-image text-blue-400"></i> Upload Pic
+                </button>
+            </div>
+
+            <div id="searchResults" class="flex-1 overflow-y-auto space-y-2 pb-10">
+                <div class="text-center text-slate-600 mt-10 text-sm">
+                    Search databases or use AI scan.<br>
+                    Try searching for supplements or fast food directly.
+                </div>
+            </div>
         </div>
 
         <div id="view-favs" class="hidden flex-col flex-1 p-4">
@@ -140,60 +136,159 @@
         </div>
     </div>
 
-    <!-- MODAL: EDIT -->
+    <!-- MODAL: EDIT FOOD -->
     <div id="editModal" class="fixed inset-0 bg-black/80 z-[60] hidden flex items-end justify-center backdrop-blur-sm">
-        <div class="bg-slate-900 w-full rounded-t-3xl p-6 border-t border-slate-700">
+        <div class="bg-slate-900 w-full rounded-t-3xl p-6 border-t border-slate-700 shadow-2xl">
             <div class="flex justify-between items-start mb-6">
-                <div><h2 id="editName" class="text-xl font-bold text-white">Food</h2><div class="text-xs text-emerald-400 mt-1" id="editSource">DB</div></div>
+                <div>
+                    <h2 id="editName" class="text-xl font-bold text-white">Food Name</h2>
+                    <div class="text-xs text-emerald-400 mt-1" id="editSource">Source: Database</div>
+                </div>
                 <button onclick="closeEditModal()" class="bg-slate-800 w-8 h-8 rounded-full text-slate-400"><i class="fa-solid fa-xmark"></i></button>
             </div>
+
             <div class="flex gap-4 mb-6">
-                <input type="number" id="editQty" class="flex-1 bg-slate-800 text-white text-2xl font-bold p-3 rounded-xl outline-none">
-                <select id="editUnit" class="w-1/3 bg-slate-800 text-white text-lg p-3 rounded-xl outline-none"><option value="g">g</option><option value="ml">ml</option><option value="portion">srv</option></select>
+                <div class="flex-1">
+                    <label class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Quantity</label>
+                    <input type="number" id="editQty" class="w-full bg-slate-800 text-white text-2xl font-bold p-3 rounded-xl mt-1 focus:ring-1 ring-emerald-500 outline-none" value="100">
+                </div>
+                <div class="w-1/3">
+                    <label class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Unit</label>
+                    <select id="editUnit" class="w-full bg-slate-800 text-white text-lg p-3 rounded-xl mt-1 outline-none h-[56px]">
+                        <option value="g">g</option>
+                        <option value="ml">ml</option>
+                        <option value="portion">srv</option>
+                    </select>
+                </div>
             </div>
-            <div class="grid grid-cols-4 gap-2 mb-6 text-center">
-                <div class="bg-slate-800 p-2 rounded"><div class="text-[10px] text-slate-500">Kcal</div><div id="editKcal" class="font-bold">0</div></div>
-                <div class="bg-slate-800 p-2 rounded"><div class="text-[10px] text-slate-500">Carb</div><div id="editCarb" class="font-bold text-blue-400">0</div></div>
-                <div class="bg-slate-800 p-2 rounded"><div class="text-[10px] text-slate-500">Prot</div><div id="editProt" class="font-bold text-red-400">0</div></div>
-                <div class="bg-slate-800 p-2 rounded"><div class="text-[10px] text-slate-500">Fat</div><div id="editFat" class="font-bold text-yellow-400">0</div></div>
+
+            <div class="grid grid-cols-4 gap-2 mb-6">
+                <div class="bg-slate-800 rounded-lg p-2 text-center">
+                    <div class="text-[10px] text-slate-500">Kcal</div>
+                    <div id="editKcal" class="font-bold text-white">0</div>
+                </div>
+                <div class="bg-slate-800 rounded-lg p-2 text-center">
+                    <div class="text-[10px] text-slate-500">Carbs</div>
+                    <div id="editCarbs" class="font-bold text-blue-400">0</div>
+                </div>
+                <div class="bg-slate-800 rounded-lg p-2 text-center">
+                    <div class="text-[10px] text-slate-500">Prot</div>
+                    <div id="editProt" class="font-bold text-red-400">0</div>
+                </div>
+                <div class="bg-slate-800 rounded-lg p-2 text-center">
+                    <div class="text-[10px] text-slate-500">Fat</div>
+                    <div id="editFat" class="font-bold text-yellow-400">0</div>
+                </div>
             </div>
-            <div class="flex gap-3"><button id="addToFavBtn" class="p-4 bg-slate-800 rounded-xl" onclick="toggleFavorite()"><i class="fa-regular fa-heart"></i></button><button onclick="saveLog()" class="flex-1 bg-emerald-600 text-white rounded-xl font-bold">Log Food</button></div>
+            
+            <div class="flex gap-3">
+                <button id="addToFavBtn" class="p-4 bg-slate-800 text-slate-400 rounded-xl"><i class="fa-regular fa-heart"></i></button>
+                <button onclick="saveLog()" class="flex-1 bg-emerald-600 text-white rounded-xl font-bold text-lg shadow-lg shadow-emerald-900/50">Add to Diary</button>
+            </div>
         </div>
     </div>
 
-    <!-- PROFILE MODAL -->
+    <!-- MODAL: PROFILE & GOALS -->
     <div id="profileModal" class="fixed inset-0 bg-slate-950 z-50 translate-y-full transition-transform duration-300 overflow-y-auto">
         <div class="p-4">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold text-emerald-400">Profile</h2>
+                <h2 class="text-2xl font-bold text-emerald-400">Profile & Goals</h2>
                 <button onclick="closeProfile()" class="text-slate-400"><i class="fa-solid fa-xmark text-2xl"></i></button>
             </div>
-            <div class="bg-slate-900 p-4 rounded-xl mb-6">
-                <h3 class="text-sm font-bold text-slate-300 mb-3 border-b border-slate-800 pb-2">Auto Calculator</h3>
-                <div class="grid grid-cols-2 gap-3 mb-3">
-                    <input type="number" id="pWeight" class="input-dark" placeholder="Weight">
-                    <input type="number" id="pHeight" class="input-dark" placeholder="Height">
-                    <input type="number" id="pAge" class="input-dark" placeholder="Age">
-                    <select id="pGender" class="input-dark"><option value="male">Male</option><option value="female">Female</option></select>
+
+            <div class="space-y-4 mb-6">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-xs text-slate-500">Weight (kg)</label>
+                        <input type="number" id="pWeight" class="input-dark" value="70">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-500">Height (cm)</label>
+                        <input type="number" id="pHeight" class="input-dark" value="175">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-500">Age</label>
+                        <input type="number" id="pAge" class="input-dark" value="30">
+                    </div>
+                    <div>
+                        <label class="text-xs text-slate-500">Gender</label>
+                        <select id="pGender" class="input-dark">
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                        </select>
+                    </div>
                 </div>
-                <select id="pActivity" class="input-dark mb-3"><option value="1.2">Sedentary</option><option value="1.55">Moderate</option><option value="1.725">Active</option></select>
-                <select id="pGoal" class="input-dark mb-3"><option value="-500">Lose Weight</option><option value="0">Maintain</option><option value="500">Gain Muscle</option></select>
-                <button onclick="calculateGoals()" class="w-full py-2 bg-slate-700 rounded-lg text-sm font-bold">Calculate Auto</button>
+
+                <div>
+                    <label class="text-xs text-slate-500">Activity Level</label>
+                    <select id="pActivity" class="input-dark">
+                        <option value="1.2">Sedentary (Office job)</option>
+                        <option value="1.375">Light Exercise (1-2 days)</option>
+                        <option value="1.55">Moderate (3-5 days)</option>
+                        <option value="1.725">Active (6-7 days)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="text-xs text-slate-500">Goal</label>
+                    <select id="pGoal" class="input-dark">
+                        <option value="-500">Lose Weight (-0.5kg/week)</option>
+                        <option value="-250">Slow Cut (-0.25kg/week)</option>
+                        <option value="0">Maintain Weight</option>
+                        <option value="250">Lean Bulk (+0.25kg/week)</option>
+                        <option value="500">Gain Muscle (+0.5kg/week)</option>
+                    </select>
+                </div>
             </div>
-            <div class="bg-slate-900 p-4 rounded-xl border border-emerald-900/30">
-                <h3 class="text-sm font-bold text-emerald-400 mb-3 border-b border-emerald-900/30 pb-2">Manual Targets</h3>
-                <div class="space-y-3">
-                    <div class="flex justify-between items-center"><label class="text-sm text-slate-400">Calories</label><input type="number" id="manualKcal" class="input-dark w-24 text-right font-bold text-white"></div>
-                    <div class="flex justify-between items-center"><label class="text-sm text-slate-400">Protein (g)</label><input type="number" id="manualProt" class="input-dark w-24 text-right text-red-400"></div>
-                    <div class="flex justify-between items-center"><label class="text-sm text-slate-400">Carbs (g)</label><input type="number" id="manualCarb" class="input-dark w-24 text-right text-blue-400"></div>
-                    <div class="flex justify-between items-center"><label class="text-sm text-slate-400">Fat (g)</label><input type="number" id="manualFat" class="input-dark w-24 text-right text-yellow-400"></div>
-                </div>
-                <button onclick="saveManualGoals()" class="w-full py-3 bg-emerald-600 rounded-xl font-bold mt-4">Save Manual Targets</button>
+
+            <button onclick="calculateGoals()" class="w-full py-3 bg-emerald-600 rounded-xl font-bold mb-6">Calculate & Save Goals</button>
+
+            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800">
+                <h3 class="font-bold mb-2">Current Daily Targets</h3>
+                <div class="flex justify-between text-sm py-1 border-b border-slate-800"><span>Calories</span><span id="targetKcal" class="text-emerald-400">2000</span></div>
+                <div class="flex justify-between text-sm py-1 border-b border-slate-800"><span>Protein</span><span id="targetProt" class="text-red-400">150g</span></div>
+                <div class="flex justify-between text-sm py-1 border-b border-slate-800"><span>Carbs</span><span id="targetCarb" class="text-blue-400">250g</span></div>
+                <div class="flex justify-between text-sm py-1"><span>Fat</span><span id="targetFat" class="text-yellow-400">70g</span></div>
             </div>
         </div>
     </div>
-    
-    <div id="microsModal" class="fixed inset-0 bg-black/80 z-[70] hidden p-4 flex items-center justify-center"><div class="bg-slate-900 w-full p-4 rounded-xl"><div id="microList"></div><button onclick="document.getElementById('microsModal').classList.add('hidden')" class="mt-4 w-full bg-slate-800 py-2 rounded">Close</button></div></div>
+
+    <!-- MODAL: MICROS -->
+    <div id="microsModal" class="fixed inset-0 bg-black/80 z-[70] hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 w-full max-w-sm rounded-2xl p-6 border border-slate-700">
+            <div class="flex justify-between mb-4">
+                <h3 class="text-lg font-bold">Daily Micronutrients</h3>
+                <button onclick="document.getElementById('microsModal').classList.add('hidden')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="microList" class="space-y-2 text-sm"></div>
+            <div class="text-[10px] text-slate-500 mt-4 text-center">*Values are estimates based on available database info.</div>
+        </div>
+    </div>
+
+    <!-- MODAL: MEAL PLANNER -->
+    <div id="plannerModal" class="fixed inset-0 bg-slate-950 z-50 translate-y-full transition-transform duration-300 overflow-y-auto p-4">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-bold text-emerald-400">AI Meal Planner</h2>
+            <button onclick="closePlanner()" class="text-slate-400"><i class="fa-solid fa-xmark text-2xl"></i></button>
+        </div>
+        <p class="text-sm text-slate-400 mb-2">Enter ingredients you have:</p>
+        <textarea id="plannerInput" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white h-24 mb-3" placeholder="e.g. Chicken breast, broccoli, rice, soy sauce..."></textarea>
+        <button onclick="generateMealPlan()" class="w-full py-3 bg-blue-600 rounded-xl font-bold mb-6">Generate Meal Idea</button>
+        
+        <div id="plannerResult" class="hidden bg-slate-900 p-4 rounded-xl border border-slate-800">
+            <h3 id="planTitle" class="font-bold text-lg mb-2 text-white"></h3>
+            <p id="planRecipe" class="text-sm text-slate-300 mb-4 whitespace-pre-wrap"></p>
+            <div class="bg-slate-950 p-3 rounded-lg">
+                <div class="text-xs font-bold text-slate-500 uppercase mb-2">Grocery List</div>
+                <ul id="planGrocery" class="text-sm space-y-1 list-disc list-inside text-slate-300"></ul>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .input-dark { width: 100%; background: #1e293b; border: 1px solid #334155; padding: 8px; border-radius: 8px; color: white; margin-top: 4px; }
+        .input-dark:focus { border-color: #34d399; outline: none; }
+    </style>
 
     <input type="file" id="visionCam" accept="image/*" capture="environment" class="hidden" onchange="handleVision(this)">
     <input type="file" id="visionGal" accept="image/*" class="hidden" onchange="handleVision(this)">
