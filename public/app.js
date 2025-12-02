@@ -13,6 +13,14 @@ const state = {
 
 const MEALS = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
 
+const MICRO_KEYS = [
+    'vitamin_a', 'thiamin', 'riboflavin', 'vitamin_b6', 'vitamin_b12',
+    'biotin', 'folic_acid', 'niacin', 'pantothenic_acid', 'vitamin_c',
+    'vitamin_d', 'vitamin_e', 'vitamin_k', 'calcium', 'magnesium',
+    'zinc', 'chromium', 'molybdenum', 'iodine', 'selenium',
+    'phosphorus', 'manganese', 'iron', 'copper'
+];
+
 // --- INIT ---
 function init() {
     renderDate();
@@ -108,7 +116,6 @@ function renderProfileValues() {
         if(el && state.user[key]) el.value = state.user[key];
     });
 
-    // Fill Manual Inputs if they exist in state
     if(state.user.manualKcal) document.getElementById('manualKcal').value = state.user.manualKcal;
     if(state.user.manualProt) document.getElementById('manualProt').value = state.user.manualProt;
     if(state.user.manualCarb) document.getElementById('manualCarb').value = state.user.manualCarb;
@@ -133,7 +140,6 @@ window.calculateGoals = function() {
     const c = (targetKcal * 0.35) / 4;
     const f = (targetKcal * 0.35) / 9;
 
-    // Reset Manual Overrides
     state.user = { 
         weight: w, height: h, age: a, gender: g, activity: act, goal: goalOffset, 
         kcal: targetKcal, p, c, f,
@@ -175,7 +181,7 @@ function saveUserAndRefresh() {
 window.openAddModal = function(meal) {
     if(meal) state.selectedMeal = meal;
     document.getElementById('addModal').classList.remove('translate-y-full');
-    setSearchMode('search'); // Default
+    setSearchMode('search');
 };
 
 window.setSearchMode = function(mode) {
@@ -183,7 +189,6 @@ window.setSearchMode = function(mode) {
     views.forEach(v => {
         const el = document.getElementById(`view-${v}`);
         const tab = document.getElementById(`tab-${v}`);
-        
         if(v === mode) {
             el.classList.remove('hidden');
             el.classList.add('flex');
@@ -194,7 +199,6 @@ window.setSearchMode = function(mode) {
             tab.className = "text-slate-400 pb-1 whitespace-nowrap";
         }
     });
-
     if(mode === 'search') setTimeout(() => document.getElementById('searchInput').focus(), 100);
     if(mode === 'favs') renderFavorites();
 };
@@ -239,7 +243,7 @@ async function performSearch(query) {
     }
 }
 
-// --- ANALYZE INGREDIENTS (New Feature 2) ---
+// --- ANALYZE INGREDIENTS (UPDATED: ITEMIZED) ---
 window.analyzeIngredients = async function() {
     const input = document.getElementById('analyzeInput').value;
     if(!input) return alert("Please enter ingredients");
@@ -256,41 +260,50 @@ window.analyzeIngredients = async function() {
         const data = await res.json();
 
         if(data.error) throw new Error(data.error);
+        if(!data.items || data.items.length === 0) throw new Error("No items identified");
 
-        // Data will be a single aggregated food item
-        window.lastAnalyzedItem = data; 
-        resDiv.innerHTML = `
-            <div onclick="prepFoodForEdit(window.lastAnalyzedItem, true)" class="p-3 bg-slate-800 rounded-xl border border-slate-700 cursor-pointer hover:border-emerald-500 transition">
-                <div class="font-bold text-emerald-400 mb-1">Analysis Result</div>
-                <div class="text-sm text-white mb-1">${data.name}</div>
+        window.lastAnalyzedItems = data.items;
+
+        resDiv.innerHTML = data.items.map((item, idx) => `
+            <div onclick="selectAnalyzedItem(${idx})" class="p-3 bg-slate-800 rounded-xl border border-slate-700 cursor-pointer hover:border-emerald-500 transition mb-2">
+                <div class="flex justify-between">
+                    <div class="font-bold text-white mb-1">${item.name}</div>
+                    <div class="text-xs text-slate-400">${item.qty}${item.unit}</div>
+                </div>
                 <div class="grid grid-cols-4 text-center text-xs">
                     <div class="bg-slate-900 p-1 rounded">
                         <div class="text-slate-500">Kcal</div>
-                        <div>${Math.round(data.calories)}</div>
+                        <div>${Math.round(item.calories)}</div>
                     </div>
                     <div class="bg-slate-900 p-1 rounded">
                         <div class="text-slate-500">P</div>
-                        <div class="text-red-400">${Math.round(data.protein)}</div>
+                        <div class="text-red-400">${Math.round(item.protein)}</div>
                     </div>
                     <div class="bg-slate-900 p-1 rounded">
                         <div class="text-slate-500">C</div>
-                        <div class="text-blue-400">${Math.round(data.carbs)}</div>
+                        <div class="text-blue-400">${Math.round(item.carbs)}</div>
                     </div>
                     <div class="bg-slate-900 p-1 rounded">
                         <div class="text-slate-500">F</div>
-                        <div class="text-yellow-400">${Math.round(data.fat)}</div>
+                        <div class="text-yellow-400">${Math.round(item.fat)}</div>
                     </div>
                 </div>
-                <div class="text-[10px] text-slate-500 mt-2 text-center italic">Tap to add to diary</div>
             </div>
-        `;
+        `).join('');
 
     } catch (e) {
         resDiv.innerHTML = '<div class="text-red-400 text-center">Analysis Failed</div>';
     }
 };
 
-// --- CREATE MANUAL ITEM (New Feature 3) ---
+window.selectAnalyzedItem = function(index) {
+    const item = window.lastAnalyzedItems[index];
+    // Set default base_qty for editing context if missing (AI analysis usually returns specific portion)
+    if(!item.base_qty) item.base_qty = item.qty; 
+    prepFoodForEdit(item, true);
+};
+
+// --- CREATE MANUAL ITEM (UPDATED: FULL MICROS) ---
 window.saveManualItem = function() {
     const name = document.getElementById('manName').value;
     if(!name) return alert("Name required");
@@ -298,30 +311,21 @@ window.saveManualItem = function() {
     const qty = parseFloat(document.getElementById('manQty').value) || 100;
     const unit = document.getElementById('manUnit').value || 'g';
 
-    // Helper to get value
     const getVal = (id) => parseFloat(document.getElementById(id).value) || 0;
 
-    // We normalize manual entry as base (per entered qty) or calc per 100 if 'g'
-    // Simplest approach: Use entered values as the "Food Item" definition
-    // If user enters 1 Tablet, specs are per 1 tablet.
-    
-    // We calculate 'per unit' base
     const factor = (unit === 'g' || unit === 'ml') ? qty / 100 : qty; 
 
-    // But user inputs TOTAL for that QTY. So we reverse to get base per 100g/1unit
+    // Reverse to base (per 100g/unit)
     const baseCal = getVal('manKcal') / factor;
     const baseP = getVal('manProt') / factor;
     const baseC = getVal('manCarb') / factor;
     const baseF = getVal('manFat') / factor;
 
-    const micros = {
-        vitamin_a: getVal('manVitA') / factor,
-        vitamin_c: getVal('manVitC') / factor,
-        vitamin_d: getVal('manVitD') / factor,
-        calcium: getVal('manCalc') / factor,
-        iron: getVal('manIron') / factor,
-        zinc: getVal('manZinc') / factor
-    };
+    const micros = {};
+    MICRO_KEYS.forEach(key => {
+        // Input IDs are like man_vitamin_a
+        micros[key] = getVal(`man_${key}`) / factor;
+    });
 
     const item = {
         name,
@@ -338,7 +342,6 @@ window.saveManualItem = function() {
     prepFoodForEdit(item, true);
 };
 
-// Select Item & Edit Logic
 window.selectFoodFromSearch = function(index) {
     const item = window.lastSearchResults[index];
     prepFoodForEdit(item, true);
@@ -359,13 +362,15 @@ window.editExistingLog = function(id) {
 };
 
 function prepFoodForEdit(item, isNew) {
+    const factor = item.base_qty ? (item.base_qty === 100 && (item.unit === 'g'|| item.unit==='ml') ? 1 : item.base_qty) : 1;
+
     state.tempFood = {
         ...item,
         isNew,
-        baseCalories: item.baseCalories || (item.calories / (item.base_qty || 100)) * 100,
-        baseProtein: item.baseProtein || (item.protein / (item.base_qty || 100)) * 100,
-        baseCarbs: item.baseCarbs || (item.carbs / (item.base_qty || 100)) * 100,
-        baseFat: item.baseFat || (item.fat / (item.base_qty || 100)) * 100,
+        baseCalories: item.baseCalories || (item.calories / factor),
+        baseProtein: item.baseProtein || (item.protein / factor),
+        baseCarbs: item.baseCarbs || (item.carbs / factor),
+        baseFat: item.baseFat || (item.fat / factor),
         micros: item.micros || {}
     };
 
@@ -392,7 +397,6 @@ document.getElementById('editUnit').addEventListener('change', updateEditPreview
 function updateEditPreview() {
     const qty = parseFloat(document.getElementById('editQty').value) || 0;
     const unit = document.getElementById('editUnit').value;
-    
     const factor = (unit === 'g' || unit === 'ml') ? qty / 100 : qty;
 
     document.getElementById('editKcal').innerText = Math.round(state.tempFood.baseCalories * factor);
@@ -467,7 +471,7 @@ window.selectFav = function(index) {
     prepFoodForEdit(state.favorites[index], true);
 };
 
-// --- MICROS ---
+// --- MICROS (UPDATED LIST) ---
 window.openMicros = function() {
     const dayLogs = state.logs.filter(l => l.date === state.currentDate);
     const micros = {};
@@ -481,18 +485,36 @@ window.openMicros = function() {
         }
     });
 
-    const rdi = { vitamin_a: 800, vitamin_c: 80, vitamin_d: 5, calcium: 1000, iron: 14, zinc: 10 };
-    const labels = { vitamin_a: 'Vit A (µg)', vitamin_c: 'Vit C (mg)', vitamin_d: 'Vit D (µg)', calcium: 'Calcium (mg)', iron: 'Iron (mg)', zinc: 'Zinc (mg)' };
+    // Extended RDI List
+    const rdi = {
+        vitamin_a: 800, thiamin: 1.1, riboflavin: 1.4, vitamin_b6: 1.4, vitamin_b12: 2.5,
+        biotin: 50, folic_acid: 200, niacin: 16, pantothenic_acid: 6, vitamin_c: 80,
+        vitamin_d: 5, vitamin_e: 12, vitamin_k: 75, calcium: 800, magnesium: 375,
+        zinc: 10, chromium: 40, molybdenum: 50, iodine: 150, selenium: 55,
+        phosphorus: 700, manganese: 2, iron: 14, copper: 1
+    };
 
-    document.getElementById('microList').innerHTML = Object.keys(rdi).map(key => {
+    const labels = {
+        vitamin_a: 'Vit A (µg)', thiamin: 'B1 Thiamin (mg)', riboflavin: 'B2 Riboflavin (mg)',
+        vitamin_b6: 'Vit B6 (mg)', vitamin_b12: 'Vit B12 (µg)', biotin: 'Biotin (µg)',
+        folic_acid: 'Folic Acid (µg)', niacin: 'Niacin (mg)', pantothenic_acid: 'Pantothenic (mg)',
+        vitamin_c: 'Vit C (mg)', vitamin_d: 'Vit D3 (µg)', vitamin_e: 'Vit E (mg)',
+        vitamin_k: 'Vit K1 (µg)', calcium: 'Calcium (mg)', magnesium: 'Magnesium (mg)',
+        zinc: 'Zinc (mg)', chromium: 'Chromium (µg)', molybdenum: 'Molybdenum (µg)',
+        iodine: 'Iodine (µg)', selenium: 'Selenium (µg)', phosphorus: 'Phosphorus (mg)',
+        manganese: 'Manganese (mg)', iron: 'Iron (mg)', copper: 'Copper (mg)'
+    };
+
+    document.getElementById('microList').innerHTML = MICRO_KEYS.map(key => {
         const val = micros[key] || 0;
-        const pct = Math.round((val / rdi[key]) * 100);
+        const target = rdi[key] || 1;
+        const pct = Math.round((val / target) * 100);
         return `
             <div class="flex justify-between items-center bg-slate-800 p-2 rounded-lg">
-                <span class="text-slate-400">${labels[key]}</span>
+                <span class="text-slate-400 text-xs">${labels[key] || key}</span>
                 <div class="text-right">
-                    <div class="text-white font-bold">${Math.round(val)}</div>
-                    <div class="text-[10px] ${pct >= 100 ? 'text-emerald-400' : 'text-blue-400'}">${pct}% RDI</div>
+                    <div class="text-white font-bold text-sm">${Math.round(val * 10) / 10}</div>
+                    <div class="text-[10px] ${pct >= 100 ? 'text-emerald-400' : 'text-blue-400'}">${pct}%</div>
                 </div>
             </div>
         `;
