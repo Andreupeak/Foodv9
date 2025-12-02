@@ -655,10 +655,51 @@ window.changeDate = (offset) => {
 };
 
 window.exportCSV = () => {
-    const rows = state.logs.map(l => [l.date, l.meal, l.name, l.qty + l.unit, l.calories]);
-    const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
+    // We define the headers to include macros + all tracked micros
+    const headers = [
+        'Date', 'Meal', 'Name', 'Qty', 'Unit', 'Calories (kcal)', 'Protein (g)', 'Carbs (g)', 'Fat (g)',
+        ...MICRO_KEYS
+    ];
+
+    const rows = state.logs.map(l => {
+        // Calculate factor to normalize micros to the actual logged quantity
+        const factor = (l.unit === 'g' || l.unit === 'ml') ? (l.qty / 100) : l.qty;
+
+        // Map micros ensuring we handle missing data gracefully
+        const microValues = MICRO_KEYS.map(k => {
+            const val = l.micros && l.micros[k] ? l.micros[k] * factor : 0;
+            return Math.round(val * 100) / 100; // Round to 2 decimals
+        });
+
+        // Combine standard log data with calculated micros
+        return [
+            l.date, 
+            l.meal, 
+            `"${l.name.replace(/"/g, '""')}"`, // Escape quotes in names
+            l.qty, 
+            l.unit, 
+            l.calories, 
+            l.protein, 
+            l.carbs, 
+            l.fat, 
+            ...microValues
+        ];
+    });
+
+    // Combine headers and rows
+    const csvContent = "data:text/csv;charset=utf-8," 
+        + headers.join(",") + "\n" 
+        + rows.map(e => e.join(",")).join("\n");
+
     const encodedUri = encodeURI(csvContent);
-    window.open(encodedUri);
+    
+    // Create a temporary link to force a download with a specific filename
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `foodlog_export_${state.currentDate}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 };
 
 init();
