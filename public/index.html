@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FoodLog Pro</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#10b981">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
+        .conic-gradient {
+            background: conic-gradient(var(--color) var(--percent), #e5e7eb 0);
+        }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .nav-item.active { color: #10b981; }
+        #scanner-container video { border-radius: 12px; object-fit: cover; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 h-screen flex flex-col overflow-hidden">
+
+    <!-- HEADER -->
+    <header class="bg-white shadow-sm p-4 z-10">
+        <div class="flex justify-between items-center mb-2">
+            <h1 class="text-xl font-bold tracking-tight text-emerald-600">FoodLog Pro</h1>
+            <div class="flex gap-3">
+                <button onclick="exportCSV()" class="text-gray-500"><i class="fa-solid fa-file-export"></i></button>
+                <button onclick="toggleSettings()" class="text-gray-500"><i class="fa-solid fa-gear"></i></button>
+            </div>
+        </div>
+        <!-- Date Scroller -->
+        <div class="flex justify-between items-center bg-gray-100 rounded-lg p-1">
+            <button onclick="changeDate(-1)" class="p-2 text-gray-500"><i class="fa-solid fa-chevron-left"></i></button>
+            <span id="currentDateDisplay" class="font-semibold text-sm">Today</span>
+            <button onclick="changeDate(1)" class="p-2 text-gray-500"><i class="fa-solid fa-chevron-right"></i></button>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT SCROLL AREA -->
+    <main class="flex-1 overflow-y-auto p-4 pb-24 hide-scrollbar" id="main-view">
+        
+        <!-- DASHBOARD SUMMARY -->
+        <div class="bg-white rounded-2xl shadow-sm p-4 mb-4 flex items-center justify-between">
+            <div class="relative w-24 h-24 rounded-full conic-gradient flex items-center justify-center" id="calCircle" style="--color: #10b981; --percent: 0%;">
+                <div class="w-20 h-20 bg-white rounded-full flex flex-col items-center justify-center">
+                    <span class="text-xs text-gray-400">Remaining</span>
+                    <span class="text-lg font-bold" id="calRemaining">2000</span>
+                </div>
+            </div>
+            <div class="flex-1 ml-6 space-y-2">
+                <div>
+                    <div class="flex justify-between text-xs mb-1"><span>Carbs</span><span id="carbVal">0/250g</span></div>
+                    <div class="h-2 bg-gray-200 rounded-full overflow-hidden"><div id="carbBar" class="h-full bg-blue-400 w-0"></div></div>
+                </div>
+                <div>
+                    <div class="flex justify-between text-xs mb-1"><span>Protein</span><span id="protVal">0/150g</span></div>
+                    <div class="h-2 bg-gray-200 rounded-full overflow-hidden"><div id="protBar" class="h-full bg-red-400 w-0"></div></div>
+                </div>
+                <div>
+                    <div class="flex justify-between text-xs mb-1"><span>Fat</span><span id="fatVal">0/70g</span></div>
+                    <div class="h-2 bg-gray-200 rounded-full overflow-hidden"><div id="fatBar" class="h-full bg-yellow-400 w-0"></div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MEALS LIST -->
+        <div id="mealsContainer" class="space-y-4">
+            <!-- Populated by JS -->
+        </div>
+
+    </main>
+
+    <!-- FLOATING ACTION BUTTON -->
+    <button onclick="openAddModal()" class="absolute bottom-20 right-4 bg-emerald-500 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-2xl z-20 hover:scale-105 transition-transform">
+        <i class="fa-solid fa-plus"></i>
+    </button>
+
+    <!-- BOTTOM NAV -->
+    <nav class="bg-white border-t flex justify-around py-3 z-30 pb-safe">
+        <button class="nav-item active flex flex-col items-center text-xs gap-1" onclick="switchTab('diary')">
+            <i class="fa-solid fa-book-open text-lg"></i> Diary
+        </button>
+        <button class="nav-item flex flex-col items-center text-xs gap-1 text-gray-400" onclick="switchTab('recipes')">
+            <i class="fa-solid fa-fire-burner text-lg"></i> Recipes
+        </button>
+        <button class="nav-item flex flex-col items-center text-xs gap-1 text-gray-400" onclick="switchTab('analysis')">
+            <i class="fa-solid fa-chart-pie text-lg"></i> Analysis
+        </button>
+    </nav>
+
+    <!-- ADD FOOD MODAL (Full Screen) -->
+    <div id="addModal" class="fixed inset-0 bg-white z-50 transform translate-y-full transition-transform duration-300 flex flex-col">
+        <div class="p-4 border-b flex items-center justify-between bg-white">
+            <button onclick="closeAddModal()" class="text-gray-500"><i class="fa-solid fa-xmark text-xl"></i></button>
+            <h2 class="font-bold">Add Food</h2>
+            <button onclick="startScanner()" class="text-emerald-600"><i class="fa-solid fa-barcode text-xl"></i></button>
+        </div>
+        
+        <!-- Search & Scanner Area -->
+        <div class="p-4">
+            <div id="scanner-container" class="mb-4 hidden"></div>
+            <div class="relative">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-gray-400"></i>
+                <input type="text" id="searchInput" placeholder="Search (German DB) or Scan..." class="w-full bg-gray-100 p-2 pl-10 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500">
+            </div>
+            <div class="flex gap-2 mt-3 overflow-x-auto hide-scrollbar">
+                <button onclick="setSearchMode('text')" class="px-4 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-medium whitespace-nowrap">Search</button>
+                <button onclick="triggerVision()" class="px-4 py-1 bg-gray-100 text-gray-600 rounded-full text-sm font-medium whitespace-nowrap"><i class="fa-solid fa-camera mr-1"></i>AI Scan</button>
+                <button onclick="setSearchMode('favorites')" class="px-4 py-1 bg-gray-100 text-gray-600 rounded-full text-sm font-medium whitespace-nowrap">Favorites</button>
+            </div>
+        </div>
+
+        <!-- Search Results -->
+        <div id="searchResults" class="flex-1 overflow-y-auto p-4 space-y-2">
+            <div class="text-center text-gray-400 mt-10">Type to search or scan a barcode</div>
+        </div>
+        
+        <!-- Hidden File Input for Vision -->
+        <input type="file" id="visionInput" accept="image/*" capture="environment" class="hidden" onchange="handleVisionImage(this)">
+    </div>
+
+    <!-- SCRIPT -->
+    <script src="/app.js"></script>
+</body>
+</html>
