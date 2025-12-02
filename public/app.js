@@ -8,7 +8,8 @@ const state = {
     favorites: JSON.parse(localStorage.getItem('foodlog_favs')) || [],
     currentDate: new Date().toISOString().split('T')[0],
     selectedMeal: 'Breakfast',
-    tempFood: null
+    tempFood: null,
+    activeTab: 'search' 
 };
 
 const MEALS = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
@@ -185,6 +186,7 @@ window.openAddModal = function(meal) {
 };
 
 window.setSearchMode = function(mode) {
+    state.activeTab = mode;
     const views = ['search', 'analyze', 'create', 'favs'];
     views.forEach(v => {
         const el = document.getElementById(`view-${v}`);
@@ -243,7 +245,7 @@ async function performSearch(query) {
     }
 }
 
-// --- ANALYZE INGREDIENTS (UPDATED: ITEMIZED) ---
+// --- ANALYZE INGREDIENTS ---
 window.analyzeIngredients = async function() {
     const input = document.getElementById('analyzeInput').value;
     if(!input) return alert("Please enter ingredients");
@@ -298,12 +300,11 @@ window.analyzeIngredients = async function() {
 
 window.selectAnalyzedItem = function(index) {
     const item = window.lastAnalyzedItems[index];
-    // Set default base_qty for editing context if missing (AI analysis usually returns specific portion)
     if(!item.base_qty) item.base_qty = item.qty; 
     prepFoodForEdit(item, true);
 };
 
-// --- CREATE MANUAL ITEM (UPDATED: FULL MICROS) ---
+// --- CREATE MANUAL ITEM ---
 window.saveManualItem = function() {
     const name = document.getElementById('manName').value;
     if(!name) return alert("Name required");
@@ -315,7 +316,6 @@ window.saveManualItem = function() {
 
     const factor = (unit === 'g' || unit === 'ml') ? qty / 100 : qty; 
 
-    // Reverse to base (per 100g/unit)
     const baseCal = getVal('manKcal') / factor;
     const baseP = getVal('manProt') / factor;
     const baseC = getVal('manCarb') / factor;
@@ -323,20 +323,13 @@ window.saveManualItem = function() {
 
     const micros = {};
     MICRO_KEYS.forEach(key => {
-        // Input IDs are like man_vitamin_a
         micros[key] = getVal(`man_${key}`) / factor;
     });
 
     const item = {
-        name,
-        qty,
-        unit,
-        baseCalories: baseCal,
-        baseProtein: baseP,
-        baseCarbs: baseC,
-        baseFat: baseF,
-        micros,
-        source: 'Manual'
+        name, qty, unit,
+        baseCalories: baseCal, baseProtein: baseP, baseCarbs: baseC, baseFat: baseF,
+        micros, source: 'Manual'
     };
 
     prepFoodForEdit(item, true);
@@ -379,6 +372,13 @@ function prepFoodForEdit(item, isNew) {
     favBtn.innerHTML = isFav ? '<i class="fa-solid fa-heart text-red-500"></i>' : '<i class="fa-regular fa-heart"></i>';
     favBtn.onclick = () => toggleFavorite();
 
+    // Set Meal Dropdown
+    const mealSelect = document.getElementById('editMeal');
+    mealSelect.value = item.meal || state.selectedMeal;
+
+    // Toggle Delete Button
+    document.getElementById('btnDeleteLog').classList.toggle('hidden', isNew);
+
     openEditModal();
 }
 
@@ -408,12 +408,15 @@ function updateEditPreview() {
 window.saveLog = function() {
     const qty = parseFloat(document.getElementById('editQty').value);
     const unit = document.getElementById('editUnit').value;
+    const meal = document.getElementById('editMeal').value;
     const factor = (unit === 'g' || unit === 'ml') ? qty / 100 : qty;
     
+    state.selectedMeal = meal;
+
     const log = {
         id: state.tempFood.isNew ? Math.random().toString(36).substr(2, 9) : state.tempFood.id,
         date: state.currentDate,
-        meal: state.selectedMeal,
+        meal: meal,
         name: state.tempFood.name,
         qty, unit,
         calories: state.tempFood.baseCalories * factor,
@@ -436,8 +439,26 @@ window.saveLog = function() {
 
     localStorage.setItem('foodlog_logs', JSON.stringify(state.logs));
     closeEditModal();
-    document.getElementById('addModal').classList.add('translate-y-full');
+    
+    // Feature 3: Don't close main modal if we are in 'analyze' flow
+    if (state.activeTab !== 'analyze') {
+        document.getElementById('addModal').classList.add('translate-y-full');
+    }
+    
     init();
+};
+
+window.deleteLog = function() {
+    if (!state.tempFood || state.tempFood.isNew) return;
+    if (confirm("Delete this item?")) {
+        const idx = state.logs.findIndex(l => l.id === state.tempFood.id);
+        if (idx !== -1) {
+            state.logs.splice(idx, 1);
+            localStorage.setItem('foodlog_logs', JSON.stringify(state.logs));
+        }
+        closeEditModal();
+        init();
+    }
 };
 
 // --- FAVORITES ---
@@ -447,7 +468,10 @@ function toggleFavorite() {
         state.favorites.splice(existingIdx, 1);
         document.getElementById('addToFavBtn').innerHTML = '<i class="fa-regular fa-heart"></i>';
     } else {
-        state.favorites.push(state.tempFood);
+        // Save current edited state as favorite preference (including meal category)
+        const meal = document.getElementById('editMeal').value;
+        const favItem = { ...state.tempFood, meal }; 
+        state.favorites.push(favItem);
         document.getElementById('addToFavBtn').innerHTML = '<i class="fa-solid fa-heart text-red-500"></i>';
     }
     localStorage.setItem('foodlog_favs', JSON.stringify(state.favorites));
@@ -471,7 +495,7 @@ window.selectFav = function(index) {
     prepFoodForEdit(state.favorites[index], true);
 };
 
-// --- MICROS (UPDATED LIST) ---
+// --- MICROS ---
 window.openMicros = function() {
     const dayLogs = state.logs.filter(l => l.date === state.currentDate);
     const micros = {};
@@ -485,7 +509,6 @@ window.openMicros = function() {
         }
     });
 
-    // Extended RDI List
     const rdi = {
         vitamin_a: 800, thiamin: 1.1, riboflavin: 1.4, vitamin_b6: 1.4, vitamin_b12: 2.5,
         biotin: 50, folic_acid: 200, niacin: 16, pantothenic_acid: 6, vitamin_c: 80,
