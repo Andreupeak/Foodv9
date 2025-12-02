@@ -26,6 +26,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // --- HELPER: Clean AI Response ---
+// This fixes the "Failed to parse" error by stripping markdown
 function cleanJSON(text) {
     if (!text) return null;
     return text.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -171,35 +172,6 @@ app.post('/api/plan-meal', async (req, res) => {
             messages: [{
                 role: "user",
                 content: `Create a meal using: ${ingredients}. Return JSON: { "mealName": String, "recipe": String, "groceryList": [String] }`
-            }]
-        });
-        const content = cleanJSON(completion.choices[0].message.content);
-        res.json(JSON.parse(content));
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// --- API: Workout Generator ---
-app.post('/api/plan-workout', async (req, res) => {
-    const { type, days, recovery, equipment, level, activity } = req.body;
-    try {
-        const completion = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
-            messages: [{
-                role: "system",
-                content: "You are an expert fitness coach."
-            }, {
-                role: "user",
-                content: `Create a ${days}-day split workout plan.
-                Level: ${level}.
-                Activity Level: ${activity}.
-                Focus: ${type}.
-                Equipment: ${equipment}.
-                Recovery Status: ${recovery}%.
-                For each exercise, provide a very short "form_tip" (max 10 words).
-                Return strictly a JSON array where each object is a Day:
-                [{ "day": "Day 1: Chest", "exercises": [{ "name": "Bench Press", "sets": "3x10", "form_tip": "Keep core tight" }] }]`
             }]
         });
         const content = cleanJSON(completion.choices[0].message.content);
