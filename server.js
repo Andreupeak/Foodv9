@@ -25,7 +25,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// --- HELPER: Extract Micros from OpenFoodFacts ---
+// --- HELPER: Extract Micros ---
 function extractMicros(nutriments) {
     if (!nutriments) return {};
     return {
@@ -40,32 +40,36 @@ function extractMicros(nutriments) {
     };
 }
 
-// --- API: Search (OFF -> Edamam -> AI Fallback) ---
+// --- API: Search ---
 app.post('/api/search', async (req, res) => {
     const { query, mode } = req.body;
 
-    // 1. OPEN FOOD FACTS (German Priority)
     try {
-        const country = 'de'; 
-        let url;
-        
         if (mode === 'barcode') {
-            url = `https://world.openfoodfacts.org/api/v2/product/${query}.json`;
-        } else {
-            url = `https://de.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=5`;
+            const url = `https://world.openfoodfacts.org/api/v2/product/${query}.json`;
+            const response = await axios.get(url, { timeout: 4000 });
+            if (response.data.status === 1) {
+                const p = response.data.product;
+                return res.json([{
+                    name: p.product_name || "Unknown Product",
+                    brand: p.brands || "",
+                    calories: p.nutriments?.['energy-kcal'] || 0,
+                    protein: p.nutriments?.proteins || 0,
+                    carbs: p.nutriments?.carbohydrates || 0,
+                    fat: p.nutriments?.fat || 0,
+                    micros: extractMicros(p.nutriments),
+                    unit: 'g', base_qty: 100, source: 'OpenFoodFacts'
+                }]);
+            }
+            return res.status(404).json({ error: 'Barcode not found' });
         }
 
+        // Text Search
+        const url = `https://de.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=5`;
         const response = await axios.get(url, { timeout: 4000 });
-        let products = [];
-
-        if (mode === 'barcode' && response.data.status === 1) {
-            products = [response.data.product];
-        } else if (response.data.products) {
-            products = response.data.products;
-        }
-
-        if (products.length > 0) {
-            const results = products.map(p => ({
+        
+        if (response.data.products && response.data.products.length > 0) {
+             const results = response.data.products.map(p => ({
                 name: p.product_name || p.product_name_de || "Unknown Product",
                 brand: p.brands || "",
                 calories: p.nutriments?.['energy-kcal'] || 0,
@@ -73,38 +77,22 @@ app.post('/api/search', async (req, res) => {
                 carbs: p.nutriments?.carbohydrates || 0,
                 fat: p.nutriments?.fat || 0,
                 micros: extractMicros(p.nutriments),
-                unit: 'g', 
-                base_qty: 100,
-                source: 'OpenFoodFacts'
+                unit: 'g', base_qty: 100, source: 'OpenFoodFacts'
             }));
             return res.json(results);
         }
-    } catch (e) {
-        console.log("OFF Error, trying fallback...");
-    }
 
-    // 2. IF BARCODE FAILED, RETURN ERROR IMMEDIATELY
-    if (mode === 'barcode') {
-        return res.status(404).json({ error: 'Barcode not found' });
-    }
-
-    // 3. AI FALLBACK (For "Mivolis", "Big Mac", etc.)
-    // If text search failed or returned nothing useful, we ask AI to estimate.
-    try {
-        console.log(`Using AI fallback for: ${query}`);
+        // AI Fallback
         const completion = await openai.chat.completions.create({
             model: "gpt-4o-mini",
             messages: [{
                 role: "user",
-                content: `User searched for "${query}". It was not found in the database. 
-                Return a JSON object for 1 standard serving (or 100g if generic) of this item.
-                Include: name, calories, protein, carbs, fat, and estimated micros (vitamin_a, vitamin_c, vitamin_d, calcium, iron, zinc, magnesium, potassium) in standard units (mg/ug).
-                If it's a supplement (like Mivolis A-Z), estimate the values per tablet.
-                Response format: { "name":Str, "base_qty":Num, "unit":Str, "calories":Num, "protein":Num, "carbs":Num, "fat":Num, "micros":{...} }
-                Strict JSON only.`
+                content: `User searched for "${query}" (not found in DB). Return JSON for 1 standard serving (or 100g).
+                Include: name, calories, protein, carbs, fat, unit (e.g. 'g' or 'portion'), base_qty (amount for these stats).
+                Response: { "name":Str, "calories":Num, "protein":Num, "carbs":Num, "fat":Num, "unit":Str, "base_qty":Num, "micros":{} }
+                Strict JSON.`
             }]
         });
-
         const content = completion.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
         const aiItem = JSON.parse(content);
         aiItem.source = 'AI Estimate';
@@ -115,20 +103,17 @@ app.post('/api/search', async (req, res) => {
     }
 });
 
-// --- API: Meal Planner ---
-app.post('/api/plan-meal', async (req, res) => {
-    const { ingredients } = req.body;
+// --- API: Parse Ingredients (Multi-Add) ---
+app.post('/api/parse-ingredients', async (req, res) => {
+    const { text } = req.body;
     try {
         const completion = await openai.chat.completions.create({
             model: "gpt-4o-mini",
             messages: [{
-                role: "system", 
-                content: "You are a meal planner. Create a meal using the provided ingredients. Return strictly JSON."
-            }, {
                 role: "user",
-                content: `I have these ingredients: ${ingredients}.
-                Suggest a meal name, a brief recipe, and a grocery list of missing items I might need (keep it simple).
-                JSON Format: { "mealName": String, "recipe": String, "groceryList": [String, String] }`
+                content: `Parse this text into a list of food items with nutrition: "${text}".
+                Return a JSON Array. Each object: { "name":Str, "qty":Num, "unit":Str (e.g. 'g', 'ml', 'cup'), "calories":Num, "protein":Num, "carbs":Num, "fat":Num, "micros": {} }.
+                Stats should be TOTAL for the specific quantity mentioned.`
             }]
         });
         const content = completion.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -143,24 +128,66 @@ app.post('/api/vision', upload.single('image'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No image' });
         const base64 = fs.readFileSync(req.file.path).toString('base64');
-        
         const response = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
             messages: [{
                 role: 'user',
                 content: [
                     { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } },
-                    { type: 'text', text: 'Identify food & estimate portion. Return JSON: { "name":Str, "estimated_weight_g":Num, "calories":Num, "protein":Num, "carbs":Num, "fat":Num, "micros": { "vitamin_a":Num, "vitamin_c":Num, "calcium":Num, "iron":Num } }. Values for WHOLE portion.' }
+                    { type: 'text', text: 'Identify food & estimate portion. Return JSON: { "name":Str, "estimated_weight_g":Num, "calories":Num, "protein":Num, "carbs":Num, "fat":Num, "micros": {} }. Values for WHOLE portion.' }
                 ]
             }],
             max_tokens: 400
         });
-
         fs.unlinkSync(req.file.path);
         const content = response.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
         res.json(JSON.parse(content));
     } catch (err) {
         if (req.file) fs.unlinkSync(req.file.path);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- API: Meal Planner ---
+app.post('/api/plan-meal', async (req, res) => {
+    const { ingredients } = req.body;
+    try {
+        const completion = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [{
+                role: "user",
+                content: `Create a meal using: ${ingredients}. Return JSON: { "mealName": String, "recipe": String, "groceryList": [String] }`
+            }]
+        });
+        const content = completion.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
+        res.json(JSON.parse(content));
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// --- API: Workout Generator ---
+app.post('/api/plan-workout', async (req, res) => {
+    const { type, days, recovery, equipment } = req.body;
+    try {
+        const completion = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [{
+                role: "system",
+                content: "You are an expert fitness coach. Create structured workout plans."
+            }, {
+                role: "user",
+                content: `Create a ${days}-day split workout plan.
+                Focus: ${type}.
+                Equipment: ${equipment}.
+                User Recovery: ${recovery}% (If low, suggest lighter intensity or deload).
+                Return strictly a JSON array where each object is a Day:
+                [{ "day": "Day 1: Chest", "exercises": [{ "name": "Bench Press", "sets": "3x10", "note": "Focus on form" }] }]`
+            }]
+        });
+        const content = completion.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
+        res.json(JSON.parse(content));
+    } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
