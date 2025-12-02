@@ -15,7 +15,6 @@
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        /* Dark Mode Conic Gradient */
         .conic-gradient { background: conic-gradient(var(--color) var(--percent), #1e293b 0); }
         .input-dark { width: 100%; background: #1e293b; border: 1px solid #334155; padding: 8px; border-radius: 8px; color: white; margin-top: 4px; }
         .input-dark:focus { border-color: #34d399; outline: none; }
@@ -23,6 +22,7 @@
 </head>
 <body class="bg-slate-950 text-slate-100 h-screen flex flex-col overflow-hidden">
 
+    <!-- HEADER -->
     <header class="bg-slate-900 border-b border-slate-800 p-4 z-10 flex justify-between items-center">
         <div>
             <h1 class="text-xl font-bold tracking-tight text-emerald-400">FoodLog Pro</h1>
@@ -35,13 +35,13 @@
         </div>
     </header>
 
+    <!-- MAIN SCROLL VIEW -->
     <main class="flex-1 overflow-y-auto p-4 pb-24 hide-scrollbar" id="main-view">
-        
+        <!-- DASHBOARD -->
         <div class="bg-slate-900 rounded-2xl p-5 mb-5 border border-slate-800 relative">
             <button onclick="openMicros()" class="absolute top-4 right-4 text-xs text-emerald-400 bg-emerald-950 px-2 py-1 rounded border border-emerald-900">
                 <i class="fa-solid fa-vial"></i> Micros
             </button>
-
             <div class="flex items-center">
                 <div class="relative w-28 h-28 rounded-full conic-gradient flex items-center justify-center shadow-2xl shadow-emerald-900/20" id="calCircle" style="--color: #34d399; --percent: 0%;">
                     <div class="w-24 h-24 bg-slate-900 rounded-full flex flex-col items-center justify-center border-4 border-slate-900">
@@ -66,15 +66,16 @@
                 </div>
             </div>
         </div>
-
+        <!-- MEALS LIST -->
         <div id="mealsContainer" class="space-y-4"></div>
-
     </main>
 
+    <!-- FLOATING BUTTON -->
     <button onclick="openAddModal()" class="absolute bottom-20 right-4 bg-emerald-500 text-white w-14 h-14 rounded-full shadow-lg shadow-emerald-500/30 flex items-center justify-center text-2xl z-20 active:scale-95 transition-transform">
         <i class="fa-solid fa-plus"></i>
     </button>
 
+    <!-- BOTTOM NAV -->
     <nav class="bg-slate-900 border-t border-slate-800 flex justify-around py-3 z-30 pb-safe">
         <button class="nav-item active flex flex-col items-center text-[10px] gap-1 text-emerald-400" onclick="switchView('diary')">
             <i class="fa-solid fa-book-open text-xl"></i> Diary
@@ -82,11 +83,12 @@
         <button class="nav-item flex flex-col items-center text-[10px] gap-1 text-slate-500" onclick="openPlanner()">
             <i class="fa-solid fa-carrot text-xl"></i> Planner
         </button>
-        <button class="nav-item flex flex-col items-center text-[10px] gap-1 text-slate-500" onclick="exportCSV()">
-            <i class="fa-solid fa-file-csv text-xl"></i> Export
+        <button class="nav-item flex flex-col items-center text-[10px] gap-1 text-slate-500" onclick="openExportModal()">
+            <i class="fa-solid fa-file-export text-xl"></i> Export
         </button>
     </nav>
 
+    <!-- MODAL: ADD FOOD -->
     <div id="addModal" class="fixed inset-0 bg-slate-950 z-50 translate-y-full transition-transform duration-300 flex flex-col">
         <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900">
             <button onclick="closeAddModal()" class="text-slate-400 w-8"><i class="fa-solid fa-chevron-down text-xl"></i></button>
@@ -101,34 +103,22 @@
 
         <div id="view-search" class="flex flex-col flex-1 p-4">
             <div id="scanner-container" class="mb-4 hidden rounded-lg overflow-hidden relative border border-slate-700 h-64 bg-black"></div>
-            
             <div class="relative mb-4">
                 <i class="fa-solid fa-magnifying-glass absolute left-4 top-3.5 text-slate-500"></i>
-                <input type="text" id="searchInput" placeholder="Search (e.g., 'Big Mac' or 'Mivolis')" class="w-full bg-slate-800 text-white p-3 pl-10 rounded-xl border border-slate-700 focus:border-emerald-500 outline-none">
+                <input type="text" id="searchInput" placeholder="Search..." class="w-full bg-slate-800 text-white p-3 pl-10 rounded-xl border border-slate-700 focus:border-emerald-500 outline-none">
                 <button onclick="startScanner()" class="absolute right-3 top-2.5 text-slate-400 bg-slate-700 p-1.5 rounded-lg"><i class="fa-solid fa-barcode"></i></button>
             </div>
-
             <div class="grid grid-cols-2 gap-3 mb-4">
-                <button onclick="triggerVision('camera')" class="py-3 bg-slate-800 rounded-xl border border-slate-700 text-slate-300 text-sm font-medium flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-camera text-emerald-400"></i> Camera Scan
-                </button>
-                <button onclick="triggerVision('gallery')" class="py-3 bg-slate-800 rounded-xl border border-slate-700 text-slate-300 text-sm font-medium flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-image text-blue-400"></i> Upload Pic
-                </button>
+                <button onclick="triggerVision('camera')" class="py-3 bg-slate-800 rounded-xl border border-slate-700 text-slate-300 text-sm font-medium flex items-center justify-center gap-2"><i class="fa-solid fa-camera text-emerald-400"></i> Camera Scan</button>
+                <button onclick="triggerVision('gallery')" class="py-3 bg-slate-800 rounded-xl border border-slate-700 text-slate-300 text-sm font-medium flex items-center justify-center gap-2"><i class="fa-solid fa-image text-blue-400"></i> Upload Pic</button>
             </div>
-
-            <div id="searchResults" class="flex-1 overflow-y-auto space-y-2 pb-10">
-                <div class="text-center text-slate-600 mt-10 text-sm">
-                    Search databases or use AI scan.<br>
-                    Try searching for supplements or fast food directly.
-                </div>
-            </div>
+            <div id="searchResults" class="flex-1 overflow-y-auto space-y-2 pb-10"></div>
         </div>
 
         <div id="view-analyze" class="hidden flex-col flex-1 p-4">
-             <p class="text-sm text-slate-400 mb-2">Enter recipe or ingredient list:</p>
-             <textarea id="analyzeInput" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white h-32 mb-3" placeholder="e.g. 1 cup rice, 100g chicken breast, 1 tsp oil"></textarea>
-             <button onclick="analyzeIngredients()" class="w-full py-3 bg-blue-600 rounded-xl font-bold mb-4">Analyze Nutrition</button>
+             <p class="text-sm text-slate-400 mb-2">Enter ingredients (e.g. 100g rice, 1 banana):</p>
+             <textarea id="analyzeInput" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white h-32 mb-3"></textarea>
+             <button onclick="analyzeIngredients()" class="w-full py-3 bg-blue-600 rounded-xl font-bold mb-4">Analyze</button>
              <div id="analyzeResults" class="space-y-2 flex-1 overflow-y-auto pb-10"></div>
         </div>
 
@@ -145,55 +135,51 @@
                      <div><label class="text-xs text-slate-500">C</label><input id="manCarb" class="input-dark" type="number" placeholder="0"></div>
                      <div><label class="text-xs text-slate-500">F</label><input id="manFat" class="input-dark" type="number" placeholder="0"></div>
                 </div>
-                
                 <div class="border-t border-slate-800 pt-3 mt-3">
                     <p class="text-sm font-bold text-slate-300 mb-2">Vitamins</p>
                     <div class="grid grid-cols-2 gap-3">
                          <div><label class="text-[10px] text-slate-500">Vit A (µg)</label><input id="man_vitamin_a" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Thiamin B1 (mg)</label><input id="man_thiamin" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Riboflavin B2 (mg)</label><input id="man_riboflavin" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Vit B6 (mg)</label><input id="man_vitamin_b6" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Thiamin B1</label><input id="man_thiamin" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Riboflavin B2</label><input id="man_riboflavin" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Vit B6</label><input id="man_vitamin_b6" class="input-dark" type="number"></div>
                          <div><label class="text-[10px] text-slate-500">Vit B12 (µg)</label><input id="man_vitamin_b12" class="input-dark" type="number"></div>
                          <div><label class="text-[10px] text-slate-500">Biotin (µg)</label><input id="man_biotin" class="input-dark" type="number"></div>
                          <div><label class="text-[10px] text-slate-500">Folic Acid (µg)</label><input id="man_folic_acid" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Niacin (mg)</label><input id="man_niacin" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Pantothenic (mg)</label><input id="man_pantothenic_acid" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Vit C (mg)</label><input id="man_vitamin_c" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Niacin</label><input id="man_niacin" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Pantothenic</label><input id="man_pantothenic_acid" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Vit C</label><input id="man_vitamin_c" class="input-dark" type="number"></div>
                          <div><label class="text-[10px] text-slate-500">Vit D3 (µg)</label><input id="man_vitamin_d" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Vit E (mg)</label><input id="man_vitamin_e" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Vit E</label><input id="man_vitamin_e" class="input-dark" type="number"></div>
                          <div><label class="text-[10px] text-slate-500">Vit K1 (µg)</label><input id="man_vitamin_k" class="input-dark" type="number"></div>
                     </div>
                     <p class="text-sm font-bold text-slate-300 mb-2 mt-4">Minerals</p>
                     <div class="grid grid-cols-2 gap-3">
-                         <div><label class="text-[10px] text-slate-500">Calcium (mg)</label><input id="man_calcium" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Magnesium (mg)</label><input id="man_magnesium" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Zinc (mg)</label><input id="man_zinc" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Calcium</label><input id="man_calcium" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Magnesium</label><input id="man_magnesium" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Zinc</label><input id="man_zinc" class="input-dark" type="number"></div>
                          <div><label class="text-[10px] text-slate-500">Chromium (µg)</label><input id="man_chromium" class="input-dark" type="number"></div>
                          <div><label class="text-[10px] text-slate-500">Molybdenum (µg)</label><input id="man_molybdenum" class="input-dark" type="number"></div>
                          <div><label class="text-[10px] text-slate-500">Iodine (µg)</label><input id="man_iodine" class="input-dark" type="number"></div>
                          <div><label class="text-[10px] text-slate-500">Selenium (µg)</label><input id="man_selenium" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Phosphorus (mg)</label><input id="man_phosphorus" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Manganese (mg)</label><input id="man_manganese" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Iron (mg)</label><input id="man_iron" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Copper (mg)</label><input id="man_copper" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Phosphorus</label><input id="man_phosphorus" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Manganese</label><input id="man_manganese" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Iron</label><input id="man_iron" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Copper</label><input id="man_copper" class="input-dark" type="number"></div>
                     </div>
                 </div>
-
                 <button onclick="saveManualItem()" class="w-full py-3 bg-emerald-600 rounded-xl font-bold mt-4">Add to Diary</button>
             </div>
         </div>
-
-        <div id="view-favs" class="hidden flex-col flex-1 p-4">
-            <div id="favList" class="space-y-2"></div>
-        </div>
+        <div id="view-favs" class="hidden flex-col flex-1 p-4"><div id="favList" class="space-y-2"></div></div>
     </div>
 
+    <!-- MODAL: EDIT FOOD -->
     <div id="editModal" class="fixed inset-0 bg-black/80 z-[60] hidden flex items-end justify-center backdrop-blur-sm">
         <div class="bg-slate-900 w-full rounded-t-3xl p-6 border-t border-slate-700 shadow-2xl">
             <div class="flex justify-between items-start mb-4">
                 <div>
-                    <h2 id="editName" class="text-xl font-bold text-white">Food Name</h2>
-                    <div class="text-xs text-emerald-400 mt-1" id="editSource">Source: Database</div>
+                    <h2 id="editName" class="text-xl font-bold text-white"></h2>
+                    <div class="text-xs text-emerald-400 mt-1" id="editSource"></div>
                 </div>
                 <div class="flex gap-2">
                     <button id="btnDeleteLog" onclick="deleteLog()" class="bg-slate-800 w-8 h-8 rounded-full text-red-400 hidden"><i class="fa-solid fa-trash"></i></button>
@@ -201,6 +187,7 @@
                 </div>
             </div>
 
+            <!-- Meal Selector -->
             <div class="mb-4">
                 <label class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Meal</label>
                 <select id="editMeal" class="w-full bg-slate-800 text-white text-base p-3 rounded-xl mt-1 outline-none h-[46px] border border-slate-700">
@@ -214,7 +201,7 @@
             <div class="flex gap-4 mb-6">
                 <div class="flex-1">
                     <label class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Quantity</label>
-                    <input type="number" id="editQty" class="w-full bg-slate-800 text-white text-2xl font-bold p-3 rounded-xl mt-1 focus:ring-1 ring-emerald-500 outline-none" value="100">
+                    <input type="number" id="editQty" class="w-full bg-slate-800 text-white text-2xl font-bold p-3 rounded-xl mt-1 focus:ring-1 ring-emerald-500 outline-none">
                 </div>
                 <div class="w-1/3">
                     <label class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Unit</label>
@@ -225,76 +212,43 @@
                     </select>
                 </div>
             </div>
-
             <div class="grid grid-cols-4 gap-2 mb-6">
-                <div class="bg-slate-800 rounded-lg p-2 text-center">
-                    <div class="text-[10px] text-slate-500">Kcal</div>
-                    <div id="editKcal" class="font-bold text-white">0</div>
-                </div>
-                <div class="bg-slate-800 rounded-lg p-2 text-center">
-                    <div class="text-[10px] text-slate-500">Carbs</div>
-                    <div id="editCarbs" class="font-bold text-blue-400">0</div>
-                </div>
-                <div class="bg-slate-800 rounded-lg p-2 text-center">
-                    <div class="text-[10px] text-slate-500">Prot</div>
-                    <div id="editProt" class="font-bold text-red-400">0</div>
-                </div>
-                <div class="bg-slate-800 rounded-lg p-2 text-center">
-                    <div class="text-[10px] text-slate-500">Fat</div>
-                    <div id="editFat" class="font-bold text-yellow-400">0</div>
-                </div>
+                <div class="bg-slate-800 rounded-lg p-2 text-center"><div class="text-[10px] text-slate-500">Kcal</div><div id="editKcal" class="font-bold text-white">0</div></div>
+                <div class="bg-slate-800 rounded-lg p-2 text-center"><div class="text-[10px] text-slate-500">Carbs</div><div id="editCarbs" class="font-bold text-blue-400">0</div></div>
+                <div class="bg-slate-800 rounded-lg p-2 text-center"><div class="text-[10px] text-slate-500">Prot</div><div id="editProt" class="font-bold text-red-400">0</div></div>
+                <div class="bg-slate-800 rounded-lg p-2 text-center"><div class="text-[10px] text-slate-500">Fat</div><div id="editFat" class="font-bold text-yellow-400">0</div></div>
             </div>
-            
             <div class="flex gap-3">
-                <button id="addToFavBtn" class="p-4 bg-slate-800 text-slate-400 rounded-xl"><i class="fa-regular fa-heart"></i></button>
+                <button id="addToFavBtn" class="p-4 bg-slate-800 text-slate-400 rounded-xl"></button>
                 <button onclick="saveLog()" class="flex-1 bg-emerald-600 text-white rounded-xl font-bold text-lg shadow-lg shadow-emerald-900/50">Add to Diary</button>
             </div>
         </div>
     </div>
 
+    <!-- MODAL: PROFILE -->
     <div id="profileModal" class="fixed inset-0 bg-slate-950 z-50 translate-y-full transition-transform duration-300 overflow-y-auto">
         <div class="p-4">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-bold text-emerald-400">Profile & Goals</h2>
                 <button onclick="closeProfile()" class="text-slate-400"><i class="fa-solid fa-xmark text-2xl"></i></button>
             </div>
-
             <div class="space-y-4 mb-6">
                 <div class="grid grid-cols-2 gap-4">
                     <div><label class="text-xs text-slate-500">Weight (kg)</label><input type="number" id="pWeight" class="input-dark" value="70"></div>
                     <div><label class="text-xs text-slate-500">Height (cm)</label><input type="number" id="pHeight" class="input-dark" value="175"></div>
                     <div><label class="text-xs text-slate-500">Age</label><input type="number" id="pAge" class="input-dark" value="30"></div>
-                    <div><label class="text-xs text-slate-500">Gender</label>
-                        <select id="pGender" class="input-dark"><option value="male">Male</option><option value="female">Female</option></select>
-                    </div>
+                    <div><label class="text-xs text-slate-500">Gender</label><select id="pGender" class="input-dark"><option value="male">Male</option><option value="female">Female</option></select></div>
                 </div>
-                <div><label class="text-xs text-slate-500">Activity Level</label>
-                    <select id="pActivity" class="input-dark">
-                        <option value="1.2">Sedentary (Office job)</option>
-                        <option value="1.375">Light Exercise (1-2 days)</option>
-                        <option value="1.55">Moderate (3-5 days)</option>
-                        <option value="1.725">Active (6-7 days)</option>
-                    </select>
-                </div>
-                <div><label class="text-xs text-slate-500">Goal</label>
-                    <select id="pGoal" class="input-dark">
-                        <option value="-500">Lose Weight (-0.5kg/week)</option>
-                        <option value="-250">Slow Cut (-0.25kg/week)</option>
-                        <option value="0">Maintain Weight</option>
-                        <option value="250">Lean Bulk (+0.25kg/week)</option>
-                        <option value="500">Gain Muscle (+0.5kg/week)</option>
-                    </select>
-                </div>
+                <div><label class="text-xs text-slate-500">Activity Level</label><select id="pActivity" class="input-dark"><option value="1.2">Sedentary</option><option value="1.375">Light Ex</option><option value="1.55">Moderate</option><option value="1.725">Active</option></select></div>
+                <div><label class="text-xs text-slate-500">Goal</label><select id="pGoal" class="input-dark"><option value="-500">Lose 0.5kg/w</option><option value="0">Maintain</option><option value="500">Gain 0.5kg/w</option></select></div>
             </div>
-
             <button onclick="calculateGoals()" class="w-full py-3 bg-blue-600 rounded-xl font-bold mb-6">Auto Calculate Goals</button>
-
             <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 mb-6">
                 <h3 class="font-bold mb-3 text-emerald-400">Manual Goals (Override)</h3>
                 <div class="grid grid-cols-2 gap-3">
                     <div><label class="text-xs text-slate-500">Daily Kcal</label><input type="number" id="manualKcal" class="input-dark" placeholder="Auto"></div>
-                    <div><label class="text-xs text-slate-500">Protein (g)</label><input type="number" id="manualProt" class="input-dark" placeholder="Auto"></div>
-                    <div><label class="text-xs text-slate-500">Carbs (g)</label><input type="number" id="manualCarb" class="input-dark" placeholder="Auto"></div>
+                    <div><label class="text-xs text-slate-500">Prot (g)</label><input type="number" id="manualProt" class="input-dark" placeholder="Auto"></div>
+                    <div><label class="text-xs text-slate-500">Carb (g)</label><input type="number" id="manualCarb" class="input-dark" placeholder="Auto"></div>
                     <div><label class="text-xs text-slate-500">Fat (g)</label><input type="number" id="manualFat" class="input-dark" placeholder="Auto"></div>
                 </div>
                 <button onclick="saveManualGoals()" class="w-full py-2 bg-emerald-900/50 text-emerald-400 border border-emerald-800 rounded-lg mt-3 text-sm font-bold">Save Manual Goals</button>
@@ -302,38 +256,26 @@
         </div>
     </div>
 
-    <div id="microsModal" class="fixed inset-0 bg-black/80 z-[70] hidden flex items-center justify-center p-4">
-        <div class="bg-slate-900 w-full max-w-sm rounded-2xl p-6 border border-slate-700 h-[80vh] flex flex-col">
-            <div class="flex justify-between mb-4 shrink-0">
-                <h3 class="text-lg font-bold">Daily Micronutrients</h3>
-                <button onclick="document.getElementById('microsModal').classList.add('hidden')"><i class="fa-solid fa-xmark"></i></button>
+    <!-- MODAL: EXPORT -->
+    <div id="exportModal" class="fixed inset-0 bg-black/80 z-[70] hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 w-full max-w-sm rounded-2xl p-6 border border-slate-700">
+            <div class="flex justify-between mb-6">
+                <h3 class="text-lg font-bold">Export Data</h3>
+                <button onclick="document.getElementById('exportModal').classList.add('hidden')"><i class="fa-solid fa-xmark"></i></button>
             </div>
-            <div id="microList" class="space-y-2 text-sm overflow-y-auto flex-1 pr-2"></div>
-            <div class="text-[10px] text-slate-500 mt-4 text-center shrink-0">*Values are estimates based on available info. %RDI is approximate.</div>
-        </div>
-    </div>
-
-    <div id="plannerModal" class="fixed inset-0 bg-slate-950 z-50 translate-y-full transition-transform duration-300 overflow-y-auto p-4">
-        <div class="flex justify-between items-center mb-4">
-            <h2 class="text-xl font-bold text-emerald-400">AI Meal Planner</h2>
-            <button onclick="closePlanner()" class="text-slate-400"><i class="fa-solid fa-xmark text-2xl"></i></button>
-        </div>
-        <p class="text-sm text-slate-400 mb-2">Enter ingredients you have:</p>
-        <textarea id="plannerInput" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white h-24 mb-3" placeholder="e.g. Chicken breast, broccoli, rice, soy sauce..."></textarea>
-        <button onclick="generateMealPlan()" class="w-full py-3 bg-blue-600 rounded-xl font-bold mb-6">Generate Meal Idea</button>
-        
-        <div id="plannerResult" class="hidden bg-slate-900 p-4 rounded-xl border border-slate-800">
-            <h3 id="planTitle" class="font-bold text-lg mb-2 text-white"></h3>
-            <p id="planRecipe" class="text-sm text-slate-300 mb-4 whitespace-pre-wrap"></p>
-            <div class="bg-slate-950 p-3 rounded-lg">
-                <div class="text-xs font-bold text-slate-500 uppercase mb-2">Grocery List</div>
-                <ul id="planGrocery" class="text-sm space-y-1 list-disc list-inside text-slate-300"></ul>
+            <button onclick="exportHealthData()" class="w-full py-3 bg-red-600/90 text-white rounded-xl font-bold mb-3 flex items-center justify-center gap-2">
+                <i class="fa-solid fa-heart-pulse"></i> Copy for Apple Health
+            </button>
+            <button onclick="exportCSV()" class="w-full py-3 bg-slate-800 text-white rounded-xl font-bold flex items-center justify-center gap-2">
+                <i class="fa-solid fa-file-csv"></i> Download CSV (Excel)
+            </button>
+            <div class="text-xs text-slate-500 mt-4 text-center leading-relaxed">
+                To import into Apple Health:<br>
+                1. Tap "Copy for Apple Health"<br>
+                2. Run the "Log Food" Shortcut on your iPhone.
             </div>
         </div>
     </div>
-
-    <input type="file" id="visionCam" accept="image/*" capture="environment" class="hidden" onchange="handleVision(this)">
-    <input type="file" id="visionGal" accept="image/*" class="hidden" onchange="handleVision(this)">
 
     <script src="/app.js"></script>
 </body>
