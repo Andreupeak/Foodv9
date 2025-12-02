@@ -17,9 +17,6 @@
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         /* Dark Mode Conic Gradient */
         .conic-gradient { background: conic-gradient(var(--color) var(--percent), #1e293b 0); }
-        .modal-enter { transform: translateY(100%); }
-        .modal-enter-active { transform: translateY(0); transition: transform 0.3s ease-out; }
-        .modal-exit { transform: translateY(100%); transition: transform 0.3s ease-in; }
         .input-dark { width: 100%; background: #1e293b; border: 1px solid #334155; padding: 8px; border-radius: 8px; color: white; margin-top: 4px; }
         .input-dark:focus { border-color: #34d399; outline: none; }
     </style>
@@ -93,7 +90,7 @@
     <div id="addModal" class="fixed inset-0 bg-slate-950 z-50 translate-y-full transition-transform duration-300 flex flex-col">
         <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900">
             <button onclick="closeAddModal()" class="text-slate-400 w-8"><i class="fa-solid fa-chevron-down text-xl"></i></button>
-            <div class="flex gap-4 text-sm font-medium overflow-x-auto">
+            <div class="flex gap-4 text-sm font-medium overflow-x-auto hide-scrollbar">
                 <button onclick="setSearchMode('search')" id="tab-search" class="text-emerald-400 border-b-2 border-emerald-400 pb-1 whitespace-nowrap">Search</button>
                 <button onclick="setSearchMode('analyze')" id="tab-analyze" class="text-slate-400 pb-1 whitespace-nowrap">Analyze</button>
                 <button onclick="setSearchMode('create')" id="tab-create" class="text-slate-400 pb-1 whitespace-nowrap">Create</button>
@@ -132,11 +129,11 @@
              <p class="text-sm text-slate-400 mb-2">Enter recipe or ingredient list:</p>
              <textarea id="analyzeInput" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white h-32 mb-3" placeholder="e.g. 1 cup rice, 100g chicken breast, 1 tsp oil"></textarea>
              <button onclick="analyzeIngredients()" class="w-full py-3 bg-blue-600 rounded-xl font-bold mb-4">Analyze Nutrition</button>
-             <div id="analyzeResults" class="space-y-2 flex-1 overflow-y-auto"></div>
+             <div id="analyzeResults" class="space-y-2 flex-1 overflow-y-auto pb-10"></div>
         </div>
 
         <div id="view-create" class="hidden flex-col flex-1 p-4 overflow-y-auto">
-            <div class="space-y-3">
+            <div class="space-y-3 pb-10">
                 <div><label class="text-xs text-slate-500">Name</label><input id="manName" class="input-dark" type="text" placeholder="Item Name"></div>
                 <div class="grid grid-cols-2 gap-3">
                      <div><label class="text-xs text-slate-500">Qty</label><input id="manQty" class="input-dark" type="number" value="100"></div>
@@ -150,14 +147,35 @@
                 </div>
                 
                 <div class="border-t border-slate-800 pt-3 mt-3">
-                    <p class="text-sm font-bold text-slate-300 mb-2">Micronutrients (Optional)</p>
+                    <p class="text-sm font-bold text-slate-300 mb-2">Vitamins</p>
                     <div class="grid grid-cols-2 gap-3">
-                         <div><label class="text-[10px] text-slate-500">Vit A (µg)</label><input id="manVitA" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Vit C (mg)</label><input id="manVitC" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Vit D (µg)</label><input id="manVitD" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Calcium (mg)</label><input id="manCalc" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Iron (mg)</label><input id="manIron" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Zinc (mg)</label><input id="manZinc" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Vit A (µg)</label><input id="man_vitamin_a" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Thiamin B1 (mg)</label><input id="man_thiamin" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Riboflavin B2 (mg)</label><input id="man_riboflavin" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Vit B6 (mg)</label><input id="man_vitamin_b6" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Vit B12 (µg)</label><input id="man_vitamin_b12" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Biotin (µg)</label><input id="man_biotin" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Folic Acid (µg)</label><input id="man_folic_acid" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Niacin (mg)</label><input id="man_niacin" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Pantothenic (mg)</label><input id="man_pantothenic_acid" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Vit C (mg)</label><input id="man_vitamin_c" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Vit D3 (µg)</label><input id="man_vitamin_d" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Vit E (mg)</label><input id="man_vitamin_e" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Vit K1 (µg)</label><input id="man_vitamin_k" class="input-dark" type="number"></div>
+                    </div>
+                    <p class="text-sm font-bold text-slate-300 mb-2 mt-4">Minerals</p>
+                    <div class="grid grid-cols-2 gap-3">
+                         <div><label class="text-[10px] text-slate-500">Calcium (mg)</label><input id="man_calcium" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Magnesium (mg)</label><input id="man_magnesium" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Zinc (mg)</label><input id="man_zinc" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Chromium (µg)</label><input id="man_chromium" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Molybdenum (µg)</label><input id="man_molybdenum" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Iodine (µg)</label><input id="man_iodine" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Selenium (µg)</label><input id="man_selenium" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Phosphorus (mg)</label><input id="man_phosphorus" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Manganese (mg)</label><input id="man_manganese" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Iron (mg)</label><input id="man_iron" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Copper (mg)</label><input id="man_copper" class="input-dark" type="number"></div>
                     </div>
                 </div>
 
@@ -272,13 +290,13 @@
     </div>
 
     <div id="microsModal" class="fixed inset-0 bg-black/80 z-[70] hidden flex items-center justify-center p-4">
-        <div class="bg-slate-900 w-full max-w-sm rounded-2xl p-6 border border-slate-700">
-            <div class="flex justify-between mb-4">
+        <div class="bg-slate-900 w-full max-w-sm rounded-2xl p-6 border border-slate-700 h-[80vh] flex flex-col">
+            <div class="flex justify-between mb-4 shrink-0">
                 <h3 class="text-lg font-bold">Daily Micronutrients</h3>
                 <button onclick="document.getElementById('microsModal').classList.add('hidden')"><i class="fa-solid fa-xmark"></i></button>
             </div>
-            <div id="microList" class="space-y-2 text-sm"></div>
-            <div class="text-[10px] text-slate-500 mt-4 text-center">*Values are estimates based on available info. %RDI is approximate.</div>
+            <div id="microList" class="space-y-2 text-sm overflow-y-auto flex-1 pr-2"></div>
+            <div class="text-[10px] text-slate-500 mt-4 text-center shrink-0">*Values are estimates based on available info. %RDI is approximate.</div>
         </div>
     </div>
 
