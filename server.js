@@ -40,15 +40,12 @@ function extractMicros(nutriments) {
     };
 }
 
-// --- API: Search (OFF -> Edamam -> AI Fallback) ---
+// --- API: Search ---
 app.post('/api/search', async (req, res) => {
     const { query, mode } = req.body;
 
-    // 1. OPEN FOOD FACTS (German Priority)
     try {
-        const country = 'de'; 
         let url;
-        
         if (mode === 'barcode') {
             url = `https://world.openfoodfacts.org/api/v2/product/${query}.json`;
         } else {
@@ -83,13 +80,11 @@ app.post('/api/search', async (req, res) => {
         console.log("OFF Error, trying fallback...");
     }
 
-    // 2. IF BARCODE FAILED, RETURN ERROR IMMEDIATELY
     if (mode === 'barcode') {
         return res.status(404).json({ error: 'Barcode not found' });
     }
 
-    // 3. AI FALLBACK (For "Mivolis", "Big Mac", etc.)
-    // If text search failed or returned nothing useful, we ask AI to estimate.
+    // AI Fallback
     try {
         console.log(`Using AI fallback for: ${query}`);
         const completion = await openai.chat.completions.create({
@@ -99,7 +94,6 @@ app.post('/api/search', async (req, res) => {
                 content: `User searched for "${query}". It was not found in the database. 
                 Return a JSON object for 1 standard serving (or 100g if generic) of this item.
                 Include: name, calories, protein, carbs, fat, and estimated micros (vitamin_a, vitamin_c, vitamin_d, calcium, iron, zinc, magnesium, potassium) in standard units (mg/ug).
-                If it's a supplement (like Mivolis A-Z), estimate the values per tablet.
                 Response format: { "name":Str, "base_qty":Num, "unit":Str, "calories":Num, "protein":Num, "carbs":Num, "fat":Num, "micros":{...} }
                 Strict JSON only.`
             }]
@@ -115,6 +109,35 @@ app.post('/api/search', async (req, res) => {
     }
 });
 
+// --- API: Analyze Ingredients (New Feature 2) ---
+app.post('/api/analyze', async (req, res) => {
+    const { text } = req.body;
+    try {
+        const completion = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [{
+                role: "system",
+                content: "You are a nutrition analyzer. Calculate total nutrition for the provided list of ingredients."
+            }, {
+                role: "user",
+                content: `Analyze this list: "${text}".
+                Return a single JSON object summing up all ingredients:
+                { "name": "Combined Meal/Ingredients", "calories": TotalNum, "protein": TotalNum, "carbs": TotalNum, "fat": TotalNum, "micros": { "vitamin_a":Num, "vitamin_c":Num, "calcium":Num, "iron":Num, "zinc":Num } }.
+                Strict JSON only. No markdown.`
+            }]
+        });
+        const content = completion.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
+        const data = JSON.parse(content);
+        // Set base_qty to 100 so frontend editing logic works nicely (treated as 1 portion = 100 units internal)
+        data.base_qty = 1; 
+        data.unit = 'portion';
+        data.source = 'AI Analysis';
+        res.json(data);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // --- API: Meal Planner ---
 app.post('/api/plan-meal', async (req, res) => {
     const { ingredients } = req.body;
@@ -127,7 +150,7 @@ app.post('/api/plan-meal', async (req, res) => {
             }, {
                 role: "user",
                 content: `I have these ingredients: ${ingredients}.
-                Suggest a meal name, a brief recipe, and a grocery list of missing items I might need (keep it simple).
+                Suggest a meal name, a brief recipe, and a grocery list.
                 JSON Format: { "mealName": String, "recipe": String, "groceryList": [String, String] }`
             }]
         });
