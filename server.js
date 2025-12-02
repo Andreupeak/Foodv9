@@ -28,17 +28,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 // --- API CLIENTS ---
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const oauth = OAuth({
-  consumer: { key: process.env.FATSECRET_KEY, secret: process.env.FATSECRET_SECRET },
-  signature_method: 'HMAC-SHA1',
-  hash_function(base_string, key) {
-    return crypto.createHmac('sha1', key).update(base_string).digest('base64');
-  }
-});
-
 // --- HELPER: German OpenFoodFacts Priority ---
 async function searchOpenFoodFacts(query, isBarcode = false) {
-    // 1. Try German Database specific search first
     const countryCode = 'de'; 
     const baseUrl = `https://${countryCode}.openfoodfacts.org`;
     let url;
@@ -50,29 +41,26 @@ async function searchOpenFoodFacts(query, isBarcode = false) {
     }
 
     try {
-        console.log(`Searching OFF (DE): ${url}`);
         const response = await axios.get(url, { timeout: 5000 });
-        
         let product = null;
+
         if (isBarcode) {
              if (response.data.status === 1) product = response.data.product;
         } else {
              if (response.data.products && response.data.products.length > 0) product = response.data.products[0];
         }
 
-        // 2. Fallback to World if no product found
+        // Fallback to World
         if (!product) {
-            console.log("Not found in DE, switching to World...");
             const worldUrl = isBarcode 
                 ? `https://world.openfoodfacts.org/api/v2/product/${query}.json`
                 : `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=5`;
-            
             const fallback = await axios.get(worldUrl, { timeout: 5000 });
             if (isBarcode && fallback.data.status === 1) product = fallback.data.product;
             else if (!isBarcode && fallback.data.products?.length > 0) product = fallback.data.products[0];
         }
 
-        if (!product) throw new Error('Product not found in OpenFoodFacts');
+        if (!product) return null;
 
         return {
             name: product.product_name || product.product_name_de || "Unknown Product",
@@ -80,120 +68,105 @@ async function searchOpenFoodFacts(query, isBarcode = false) {
             protein: product.nutriments?.proteins || 0,
             carbs: product.nutriments?.carbohydrates || 0,
             fat: product.nutriments?.fat || 0,
-            unit: 'g', // OFF usually normalizes to 100g
-            serving: 100,
+            unit: 'g', // OFF standards
+            base_qty: 100, // OFF is always per 100g/ml
             source: 'OpenFoodFacts'
         };
 
     } catch (error) {
-        console.error("OFF Error:", error.message);
         return null;
     }
 }
 
 // --- ENDPOINTS ---
 
-// 1. Unified Search (Handles OFF and Edamam)
+// 1. Unified Search (OFF -> Edamam)
 app.post('/api/search', async (req, res) => {
-    const { query, mode } = req.body; // mode: 'barcode', 'text'
+    const { query, mode } = req.body;
 
+    // Barcode Strategy
     if (mode === 'barcode') {
         const offResult = await searchOpenFoodFacts(query, true);
         if (offResult) return res.json(offResult);
-        
-        // Fallback to FatSecret for barcode
-        try {
-            const token = await getFatSecretToken(); // You might need a robust token flow here, simplified for now to use OAuth1.0 signature if using Premier logic, but standard search below:
-            // ... (Keeping your existing FatSecret logic structure below)
-        } catch (e) {
-            // ignore
-        }
         return res.status(404).json({ error: 'Barcode not found' });
     }
 
-    // Text Search: Try OFF first (User preference), then Edamam
+    // Text Strategy
     const offResult = await searchOpenFoodFacts(query, false);
-    if (offResult) return res.json(offResult);
-
-    // Fallback to Edamam Parser
+    
+    // Edamam Fallback
     try {
         const url = `https://api.edamam.com/api/food-database/v2/parser?app_id=${process.env.EDAMAM_FOOD_APP_ID}&app_key=${process.env.EDAMAM_FOOD_APP_KEY}&ingr=${encodeURIComponent(query)}`;
         const edamam = await axios.get(url);
-        const hint = edamam.data.hints?.[0]?.food || edamam.data.parsed?.[0]?.food;
+        const hints = edamam.data.hints || [];
         
-        if (hint) {
-            return res.json({
-                name: hint.label,
-                calories: hint.nutrients.ENERC_KCAL || 0,
-                protein: hint.nutrients.PROCNT || 0,
-                carbs: hint.nutrients.CHOCDF || 0,
-                fat: hint.nutrients.FAT || 0,
+        // Combine results: OFF result first, then Edamam hints
+        let results = [];
+        if (offResult) results.push(offResult);
+        
+        hints.slice(0, 5).forEach(h => {
+            results.push({
+                name: h.food.label,
+                calories: h.food.nutrients.ENERC_KCAL || 0,
+                protein: h.food.nutrients.PROCNT || 0,
+                carbs: h.food.nutrients.CHOCDF || 0,
+                fat: h.food.nutrients.FAT || 0,
                 unit: 'g',
-                serving: 100,
+                base_qty: 100, // Edamam usually normalized, but we treat as base reference
                 source: 'Edamam'
             });
-        }
+        });
+
+        if (results.length > 0) return res.json(results);
+        
     } catch (e) {
-        console.error(e);
+        console.error("Edamam Error", e.message);
     }
 
     res.status(404).json({ error: 'No results found' });
 });
 
-// 2. FatSecret Search (Packaged fallback)
-app.post('/api/fatsecret/search', async (req, res) => {
+// 2. Multi-Ingredient Parser (Natural Language)
+app.post('/api/parse-ingredients', async (req, res) => {
+    const { text } = req.body;
+    if (!text) return res.status(400).json({ error: 'No text provided' });
+
     try {
-        const { query } = req.body;
-        const BASE = 'https://platform.fatsecret.com/rest/server.api';
-        const params = {
-            method: 'foods.search',
-            search_expression: query,
-            format: 'json'
-        };
-        
-        // OAuth 1.0a signing
-        const request_data = { url: BASE, method: 'POST', data: params };
-        const headers = oauth.toHeader(oauth.authorize(request_data));
-        
-        const response = await axios.post(BASE, new URLSearchParams(params), {
-            headers: { ...headers, 'Content-Type': 'application/x-www-form-urlencoded' }
+        // We use OpenAI here because it's smarter at splitting "100g rice and 2 eggs" into structured JSON than Edamam's single-item parser.
+        const response = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [{
+                role: 'user',
+                content: `Parse the following food text into a JSON array of items. 
+                Text: "${text}"
+                Return strictly a JSON array with objects containing: 
+                - name (string)
+                - qty (number, estimated grams or count)
+                - unit (string, e.g., 'g', 'ml', 'cup', 'whole')
+                - calories (number, total for this qty)
+                - protein (number, total for this qty)
+                - carbs (number, total for this qty)
+                - fat (number, total for this qty)
+                Do not include markdown formatting.` 
+            }]
         });
-        
-        res.json(response.data);
+
+        const content = response.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
+        res.json(JSON.parse(content));
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-// 3. Edamam Nutrition Analysis (Home Cooked)
-app.post('/api/analyze-recipe', async (req, res) => {
-    try {
-        const { ingredients } = req.body;
-        const url = `https://api.edamam.com/api/nutrition-details?app_id=${process.env.EDAMAM_NUTRITION_APP_ID}&app_key=${process.env.EDAMAM_NUTRITION_APP_KEY}`;
-        const response = await axios.post(url, { ingr: ingredients }, { headers: { 'Content-Type': 'application/json' } });
-        res.json(response.data);
-    } catch (err) {
-        res.status(500).json({ error: 'Analysis failed' });
-    }
-});
-
-// 4. Spoonacular Recipe Search
-app.post('/api/recipes', async (req, res) => {
-    try {
-        const { ingredients } = req.body;
-        const url = `https://api.spoonacular.com/recipes/findByIngredients?ingredients=${encodeURIComponent(ingredients)}&number=5&apiKey=${process.env.SPOONACULAR_API_KEY}`;
-        const response = await axios.get(url);
-        res.json(response.data);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// 5. OpenAI Vision
+// 3. Vision Analysis
 app.post('/api/vision', upload.single('image'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No image' });
         const base64 = fs.readFileSync(req.file.path).toString('base64');
+        
+        // User asked: How is nutrition found? 
+        // Answer: We ask OpenAI's Vision model to identify the food AND estimate the portion size simultaneously.
+        // We then ask it to calculate the nutrition for that specific estimated portion.
         
         const response = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
@@ -201,14 +174,14 @@ app.post('/api/vision', upload.single('image'), async (req, res) => {
                 role: 'user',
                 content: [
                     { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } },
-                    { type: 'text', text: 'Identify the food. Return a valid JSON object strictly with keys: "name" (string), "calories" (number), "protein" (number), "carbs" (number), "fat" (number) estimated for the visible portion. Do not wrap in markdown.' }
+                    { type: 'text', text: 'Identify the food and estimate the portion size visible. Return a valid JSON object strictly with: "name" (string), "estimated_weight_g" (number), "calories" (number), "protein" (number), "carbs" (number), "fat" (number). Values should be for the WHOLE portion visible.' }
                 ]
             }],
             max_tokens: 300
         });
 
         fs.unlinkSync(req.file.path);
-        const content = response.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '');
+        const content = response.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
         res.json(JSON.parse(content));
     } catch (err) {
         if (req.file) fs.unlinkSync(req.file.path);
