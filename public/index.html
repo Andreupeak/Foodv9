@@ -12,13 +12,12 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
-        .conic-gradient {
-            background: conic-gradient(var(--color) var(--percent), #e5e7eb 0);
-        }
+        .conic-gradient { background: conic-gradient(var(--color) var(--percent), #e5e7eb 0); }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .nav-item.active { color: #10b981; }
-        #scanner-container video { border-radius: 12px; object-fit: cover; }
+        /* Smooth IOS-like inputs */
+        input:focus, select:focus, textarea:focus { ring: 2px; ring-color: #10b981; outline: none; }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800 h-screen flex flex-col overflow-hidden">
@@ -29,10 +28,8 @@
             <h1 class="text-xl font-bold tracking-tight text-emerald-600">FoodLog Pro</h1>
             <div class="flex gap-3">
                 <button onclick="exportCSV()" class="text-gray-500"><i class="fa-solid fa-file-export"></i></button>
-                <button onclick="toggleSettings()" class="text-gray-500"><i class="fa-solid fa-gear"></i></button>
             </div>
         </div>
-        <!-- Date Scroller -->
         <div class="flex justify-between items-center bg-gray-100 rounded-lg p-1">
             <button onclick="changeDate(-1)" class="p-2 text-gray-500"><i class="fa-solid fa-chevron-left"></i></button>
             <span id="currentDateDisplay" class="font-semibold text-sm">Today</span>
@@ -40,10 +37,10 @@
         </div>
     </header>
 
-    <!-- MAIN CONTENT SCROLL AREA -->
+    <!-- MAIN CONTENT -->
     <main class="flex-1 overflow-y-auto p-4 pb-24 hide-scrollbar" id="main-view">
         
-        <!-- DASHBOARD SUMMARY -->
+        <!-- DASHBOARD -->
         <div class="bg-white rounded-2xl shadow-sm p-4 mb-4 flex items-center justify-between">
             <div class="relative w-24 h-24 rounded-full conic-gradient flex items-center justify-center" id="calCircle" style="--color: #10b981; --percent: 0%;">
                 <div class="w-20 h-20 bg-white rounded-full flex flex-col items-center justify-center">
@@ -68,9 +65,7 @@
         </div>
 
         <!-- MEALS LIST -->
-        <div id="mealsContainer" class="space-y-4">
-            <!-- Populated by JS -->
-        </div>
+        <div id="mealsContainer" class="space-y-4"></div>
 
     </main>
 
@@ -79,51 +74,103 @@
         <i class="fa-solid fa-plus"></i>
     </button>
 
-    <!-- BOTTOM NAV -->
-    <nav class="bg-white border-t flex justify-around py-3 z-30 pb-safe">
-        <button class="nav-item active flex flex-col items-center text-xs gap-1" onclick="switchTab('diary')">
-            <i class="fa-solid fa-book-open text-lg"></i> Diary
-        </button>
-        <button class="nav-item flex flex-col items-center text-xs gap-1 text-gray-400" onclick="switchTab('recipes')">
-            <i class="fa-solid fa-fire-burner text-lg"></i> Recipes
-        </button>
-        <button class="nav-item flex flex-col items-center text-xs gap-1 text-gray-400" onclick="switchTab('analysis')">
-            <i class="fa-solid fa-chart-pie text-lg"></i> Analysis
-        </button>
-    </nav>
-
-    <!-- ADD FOOD MODAL (Full Screen) -->
+    <!-- ADD/SEARCH MODAL -->
     <div id="addModal" class="fixed inset-0 bg-white z-50 transform translate-y-full transition-transform duration-300 flex flex-col">
-        <div class="p-4 border-b flex items-center justify-between bg-white">
-            <button onclick="closeAddModal()" class="text-gray-500"><i class="fa-solid fa-xmark text-xl"></i></button>
-            <h2 class="font-bold">Add Food</h2>
-            <button onclick="startScanner()" class="text-emerald-600"><i class="fa-solid fa-barcode text-xl"></i></button>
+        <div class="p-4 border-b flex items-center justify-between bg-white shadow-sm z-10">
+            <button onclick="closeAddModal()" class="text-gray-500 w-8"><i class="fa-solid fa-chevron-down text-xl"></i></button>
+            <div class="flex gap-4 text-sm font-medium">
+                <button onclick="setSearchMode('single')" id="tab-single" class="text-emerald-600 border-b-2 border-emerald-600 pb-1">Single</button>
+                <button onclick="setSearchMode('multi')" id="tab-multi" class="text-gray-400 pb-1">Multi-Add</button>
+            </div>
+            <div class="w-8"></div>
         </div>
         
-        <!-- Search & Scanner Area -->
-        <div class="p-4">
-            <div id="scanner-container" class="mb-4 hidden"></div>
-            <div class="relative">
-                <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-gray-400"></i>
-                <input type="text" id="searchInput" placeholder="Search (German DB) or Scan..." class="w-full bg-gray-100 p-2 pl-10 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500">
+        <!-- SINGLE SEARCH MODE -->
+        <div id="mode-single" class="flex flex-col flex-1">
+            <div class="p-4 bg-gray-50">
+                <div id="scanner-container" class="mb-4 hidden rounded-lg overflow-hidden relative">
+                    <button onclick="stopScanner()" class="absolute top-2 right-2 bg-black/50 text-white px-2 py-1 rounded text-xs z-10">Stop</button>
+                </div>
+                
+                <div class="relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-gray-400"></i>
+                    <input type="text" id="searchInput" placeholder="Search food..." class="w-full bg-white p-3 pl-10 rounded-xl shadow-sm">
+                    <button onclick="startScanner()" class="absolute right-3 top-2 text-gray-400 hover:text-emerald-600 p-1"><i class="fa-solid fa-barcode text-lg"></i></button>
+                </div>
+
+                <div class="flex gap-2 mt-3">
+                    <button onclick="triggerVision('camera')" class="flex-1 py-2 bg-emerald-100 text-emerald-700 rounded-lg text-sm font-medium"><i class="fa-solid fa-camera mr-2"></i>Snap Pic</button>
+                    <button onclick="triggerVision('gallery')" class="flex-1 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium"><i class="fa-solid fa-image mr-2"></i>Upload</button>
+                </div>
             </div>
-            <div class="flex gap-2 mt-3 overflow-x-auto hide-scrollbar">
-                <button onclick="setSearchMode('text')" class="px-4 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-medium whitespace-nowrap">Search</button>
-                <button onclick="triggerVision()" class="px-4 py-1 bg-gray-100 text-gray-600 rounded-full text-sm font-medium whitespace-nowrap"><i class="fa-solid fa-camera mr-1"></i>AI Scan</button>
-                <button onclick="setSearchMode('favorites')" class="px-4 py-1 bg-gray-100 text-gray-600 rounded-full text-sm font-medium whitespace-nowrap">Favorites</button>
-            </div>
+            <div id="searchResults" class="flex-1 overflow-y-auto p-4 space-y-2 bg-white"></div>
         </div>
 
-        <!-- Search Results -->
-        <div id="searchResults" class="flex-1 overflow-y-auto p-4 space-y-2">
-            <div class="text-center text-gray-400 mt-10">Type to search or scan a barcode</div>
+        <!-- MULTI ADD MODE -->
+        <div id="mode-multi" class="hidden flex-col flex-1 p-4">
+            <p class="text-sm text-gray-500 mb-2">Paste ingredients (e.g., "100g rice, 1 cup dal, 2 chapatis")</p>
+            <textarea id="multiInput" class="w-full h-32 p-3 bg-gray-50 rounded-xl mb-4 border resize-none" placeholder="Type here..."></textarea>
+            <button onclick="parseIngredients()" class="w-full py-3 bg-emerald-500 text-white rounded-xl font-bold">Analyze & Add</button>
+            <div id="multiResults" class="mt-4 space-y-2 overflow-y-auto flex-1"></div>
         </div>
-        
-        <!-- Hidden File Input for Vision -->
-        <input type="file" id="visionInput" accept="image/*" capture="environment" class="hidden" onchange="handleVisionImage(this)">
     </div>
 
-    <!-- SCRIPT -->
+    <!-- EDIT / CONFIRM MODAL -->
+    <div id="editModal" class="fixed inset-0 bg-black/50 z-[60] hidden flex items-end justify-center">
+        <div class="bg-white w-full rounded-t-2xl p-5 animate-slide-up">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h2 id="editName" class="text-xl font-bold">Food Name</h2>
+                    <div class="text-xs text-gray-400" id="editSource">Source: Database</div>
+                </div>
+                <button onclick="closeEditModal()" class="bg-gray-100 p-2 rounded-full"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                    <label class="text-xs text-gray-500 font-semibold uppercase">Quantity</label>
+                    <input type="number" id="editQty" class="w-full text-2xl font-bold border-b border-gray-200 py-1" value="100">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-500 font-semibold uppercase">Unit</label>
+                    <select id="editUnit" class="w-full text-lg border-b border-gray-200 py-2 bg-transparent">
+                        <option value="g">grams (g)</option>
+                        <option value="ml">milliliters (ml)</option>
+                        <option value="portion">portion/serving</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Dynamic Nutrition Preview -->
+            <div class="bg-gray-50 rounded-xl p-4 grid grid-cols-4 gap-2 text-center mb-6">
+                <div>
+                    <div class="text-xs text-gray-400">Kcal</div>
+                    <div id="editKcal" class="font-bold text-gray-800">0</div>
+                </div>
+                <div>
+                    <div class="text-xs text-gray-400">Carbs</div>
+                    <div id="editCarbs" class="font-bold text-blue-500">0</div>
+                </div>
+                <div>
+                    <div class="text-xs text-gray-400">Prot</div>
+                    <div id="editProt" class="font-bold text-red-500">0</div>
+                </div>
+                <div>
+                    <div class="text-xs text-gray-400">Fat</div>
+                    <div id="editFat" class="font-bold text-yellow-500">0</div>
+                </div>
+            </div>
+
+            <button id="saveEditBtn" class="w-full py-3 bg-emerald-500 text-white rounded-xl font-bold text-lg shadow-lg shadow-emerald-200">
+                Log Food
+            </button>
+        </div>
+    </div>
+
+    <!-- Hidden Inputs -->
+    <input type="file" id="visionCam" accept="image/*" capture="environment" class="hidden" onchange="handleVision(this)">
+    <input type="file" id="visionGal" accept="image/*" class="hidden" onchange="handleVision(this)">
+
     <script src="/app.js"></script>
 </body>
 </html>
