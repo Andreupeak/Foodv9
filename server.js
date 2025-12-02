@@ -26,7 +26,6 @@ app.use(express.static(path.join(__dirname, 'public')));
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // --- HELPER: Extract Micros from OpenFoodFacts ---
-// Expanded to try and catch more of the requested list
 function extractMicros(n) {
     if (!n) return {};
     return {
@@ -128,7 +127,7 @@ app.post('/api/search', async (req, res) => {
     }
 });
 
-// --- API: Analyze Ingredients (UPDATED) ---
+// --- API: Analyze Ingredients (Itemized) ---
 app.post('/api/analyze', async (req, res) => {
     const { text } = req.body;
     try {
@@ -192,7 +191,7 @@ app.post('/api/vision', upload.single('image'), async (req, res) => {
                 role: 'user',
                 content: [
                     { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } },
-                    { type: 'text', text: 'Identify food & estimate portion. Return JSON: { "name":Str, "estimated_weight_g":Num, "calories":Num, "protein":Num, "carbs":Num, "fat":Num, "micros": { ...include all major vitamins and minerals... } }. Values for WHOLE portion.' }
+                    { type: 'text', text: 'Identify food & estimate portion. Return JSON: { "name":Str, "estimated_weight_g":Num, "calories":Num, "protein":Num, "carbs":Num, "fat":Num, "micros": { "vitamin_a":Num, "vitamin_c":Num, "calcium":Num, "iron":Num } }. Values for WHOLE portion.' }
                 ]
             }],
             max_tokens: 500
