@@ -2,7 +2,6 @@ const state = {
     logs: JSON.parse(localStorage.getItem('foodlog_logs')) || [],
     user: JSON.parse(localStorage.getItem('foodlog_user')) || { kcal: 2000, p: 150, c: 250, f: 70 },
     favorites: JSON.parse(localStorage.getItem('foodlog_favs')) || [],
-    workoutPlan: JSON.parse(localStorage.getItem('foodlog_workout')) || null,
     currentDate: new Date().toISOString().split('T')[0],
     selectedMeal: 'Breakfast',
     tempFood: null
@@ -14,36 +13,43 @@ function init() {
     renderDate();
     renderMeals();
     renderDashboard();
-    renderWorkoutPlan();
+    renderProfileValues();
 }
 
-// --- SCANNER FIX ---
-let html5QrcodeScanner = null;
+// --- SCANNER FIX (Uses Html5Qrcode class reliably) ---
+let html5QrCode;
 
 window.startScanner = function() {
-    const container = document.getElementById('scanner-container');
-    container.classList.remove('hidden');
+    document.getElementById('scanner-wrapper').style.display = 'block';
     
-    if (html5QrcodeScanner) {
-        // Already running
-        return;
-    }
-
-    html5QrcodeScanner = new Html5Qrcode("scanner-container");
+    if (html5QrCode) return; // Prevent double init
+    
+    html5QrCode = new Html5Qrcode("scanner-container");
     const config = { fps: 10, qrbox: { width: 250, height: 250 } };
     
-    html5QrcodeScanner.start({ facingMode: "environment" }, config, (decodedText) => {
+    html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => {
         // Success
-        html5QrcodeScanner.stop().then(() => {
-            html5QrcodeScanner = null;
-            container.classList.add('hidden');
-            performSearch(decodedText, 'barcode');
-        });
+        stopScanner();
+        performSearch(decodedText, 'barcode');
     }).catch(err => {
-        console.error(err);
-        container.classList.add('hidden');
-        alert("Camera error. Please ensure permissions are granted.");
+        alert("Camera permission denied or error.");
+        stopScanner();
     });
+};
+
+window.stopScanner = function() {
+    if (html5QrCode) {
+        html5QrCode.stop().then(() => {
+            html5QrCode.clear();
+            html5QrCode = null;
+            document.getElementById('scanner-wrapper').style.display = 'none';
+        }).catch(() => {
+            html5QrCode = null;
+            document.getElementById('scanner-wrapper').style.display = 'none';
+        });
+    } else {
+        document.getElementById('scanner-wrapper').style.display = 'none';
+    }
 };
 
 // --- SEARCH & VISION ---
@@ -62,13 +68,10 @@ async function performSearch(query, mode = 'text') {
         if (data.error || data.length === 0) {
             resDiv.innerHTML = '<div class="text-center text-slate-500">No results found.</div>';
         } else {
-            // If barcode or single result, open edit immediately
             if (mode === 'barcode' && data.length > 0) {
                 prepFoodForEdit(data[0], true);
                 return;
             }
-            
-            // List results
             window.lastSearch = data;
             resDiv.innerHTML = data.map((item, i) => `
                 <div onclick="selectSearchItem(${i})" class="bg-slate-900 p-3 rounded-xl border border-slate-800 flex justify-between items-center cursor-pointer mb-2">
@@ -77,9 +80,7 @@ async function performSearch(query, mode = 'text') {
                 </div>
             `).join('');
         }
-    } catch (e) {
-        resDiv.innerHTML = 'Error';
-    }
+    } catch (e) { resDiv.innerHTML = 'Error'; }
 }
 
 window.selectSearchItem = (index) => prepFoodForEdit(window.lastSearch[index], true);
@@ -109,7 +110,7 @@ window.handleVision = async function(input) {
             protein: data.protein,
             carbs: data.carbs,
             fat: data.fat,
-            // Back-calc base
+            // Back-calc base for dynamic editing
             baseCalories: data.calories / factor,
             baseProtein: data.protein / factor,
             baseCarbs: data.carbs / factor,
@@ -117,12 +118,8 @@ window.handleVision = async function(input) {
             micros: data.micros || {},
             source: 'AI Vision'
         };
-        
         prepFoodForEdit(food, true);
-        
-    } catch (e) {
-        alert("Vision failed");
-    }
+    } catch (e) { alert("Vision failed"); }
 };
 
 // --- EDIT & FAVORITES ---
@@ -136,7 +133,6 @@ function prepFoodForEdit(item, isNew) {
         baseFat: item.baseFat || (item.fat / (item.qty/100||1))
     };
     
-    // Check Fav Status
     const isFav = state.favorites.some(f => f.name === item.name);
     const btn = document.getElementById('addToFavBtn');
     btn.innerHTML = isFav ? '<i class="fa-solid fa-heart text-red-500"></i>' : '<i class="fa-regular fa-heart"></i>';
@@ -163,67 +159,27 @@ function updateEdit() {
 
 window.toggleFavorite = function() {
     const idx = state.favorites.findIndex(f => f.name === state.tempFood.name);
+    const btn = document.getElementById('addToFavBtn');
     if (idx >= 0) {
         state.favorites.splice(idx, 1);
-        document.getElementById('addToFavBtn').innerHTML = '<i class="fa-regular fa-heart"></i>';
+        btn.innerHTML = '<i class="fa-regular fa-heart"></i>';
     } else {
         state.favorites.push(state.tempFood);
-        document.getElementById('addToFavBtn').innerHTML = '<i class="fa-solid fa-heart text-red-500"></i>';
+        btn.innerHTML = '<i class="fa-solid fa-heart text-red-500"></i>';
     }
     localStorage.setItem('foodlog_favs', JSON.stringify(state.favorites));
     if (document.getElementById('view-favs').style.display !== 'none') renderFavs();
 };
 
-// --- WORKOUTS ---
-window.generateWorkoutPlan = async function() {
-    const recovery = document.getElementById('recoverySlider').value;
-    const level = document.getElementById('wLevel').value;
-    const activity = document.getElementById('wActivity').value;
-    const type = document.getElementById('wType').value;
-    const days = document.getElementById('wDays').value;
-    const equip = document.getElementById('wEquip').value;
-    
-    document.getElementById('workoutModal').classList.add('translate-y-full');
-    document.getElementById('workoutPlanDisplay').innerHTML = '<div class="text-center p-10">Generating...</div>';
-
-    try {
-        const res = await fetch('/api/plan-workout', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ type, days, recovery, equipment: equip, level, activity })
-        });
-        const plan = await res.json();
-        state.workoutPlan = plan;
-        localStorage.setItem('foodlog_workout', JSON.stringify(plan));
-        renderWorkoutPlan();
-    } catch(e) {
-        alert("Error generating plan");
-    }
-};
-
-function renderWorkoutPlan() {
-    const div = document.getElementById('workoutPlanDisplay');
-    if (!state.workoutPlan) return;
-    
-    div.innerHTML = state.workoutPlan.map(day => `
-        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <h3 class="font-bold text-emerald-400 mb-2">${day.day}</h3>
-            <div class="space-y-3">
-                ${day.exercises.map(ex => `
-                    <div class="flex justify-between items-center text-sm border-l-2 border-slate-700 pl-3">
-                        <div>
-                            <div class="text-slate-200 font-medium">${ex.name}</div>
-                            <div class="text-xs text-slate-500">${ex.sets} • ${ex.form_tip || 'Focus on form'}</div>
-                        </div>
-                        <a href="[https://www.youtube.com/results?search_query=$](https://www.youtube.com/results?search_query=$){encodeURIComponent(ex.name + ' exercise form')}" target="_blank" class="text-xs bg-slate-800 text-blue-400 px-2 py-1 rounded border border-slate-700">
-                            <i class="fa-brands fa-youtube"></i> Watch
-                        </a>
-                    </div>
-                `).join('')}
-            </div>
+window.renderFavs = () => {
+    document.getElementById('favList').innerHTML = state.favorites.map((f, i) => `
+        <div onclick="selectFav(${i})" class="bg-slate-900 p-3 rounded border border-slate-800 flex justify-between cursor-pointer">
+            <span>${f.name}</span><span class="text-emerald-400">+</span>
         </div>
     `).join('');
-}
+};
+
+window.selectFav = (i) => prepFoodForEdit(state.favorites[i], true);
 
 // --- STANDARD ---
 window.saveLog = function() {
@@ -242,7 +198,6 @@ window.saveLog = function() {
         carbs: state.tempFood.baseCarbs * f,
         fat: state.tempFood.baseFat * f,
         micros: state.tempFood.micros,
-        // Persist bases
         baseCalories: state.tempFood.baseCalories,
         baseProtein: state.tempFood.baseProtein,
         baseCarbs: state.tempFood.baseCarbs,
@@ -255,6 +210,7 @@ window.saveLog = function() {
     localStorage.setItem('foodlog_logs', JSON.stringify(state.logs));
     document.getElementById('editModal').classList.add('hidden');
     document.getElementById('addModal').classList.add('translate-y-full');
+    stopScanner();
     renderMeals();
     renderDashboard();
 };
@@ -287,30 +243,68 @@ window.parseTextIngredients = async function() {
 
 // Utils
 window.openAddModal = (meal) => { if(meal) state.selectedMeal = meal; document.getElementById('addModal').classList.remove('translate-y-full'); };
-window.closeAddModal = () => { document.getElementById('addModal').classList.add('translate-y-full'); };
+window.closeAddModal = () => { document.getElementById('addModal').classList.add('translate-y-full'); stopScanner(); };
 window.setSearchMode = (mode) => {
     ['search','text','favs'].forEach(m => document.getElementById(`view-${m}`).classList.add('hidden'));
     document.getElementById(`view-${mode}`).classList.remove('hidden');
     if(mode==='favs') renderFavs();
-};
-window.renderFavs = () => {
-    document.getElementById('favList').innerHTML = state.favorites.map(f => `
-        <div onclick="prepFoodForEdit(state.favorites.find(x=>x.name==='${f.name}'), true)" class="bg-slate-900 p-3 rounded border border-slate-800 flex justify-between">
-            <span>${f.name}</span><span class="text-emerald-400">+</span>
-        </div>
-    `).join('');
+    if(mode==='search') document.getElementById('searchInput').focus();
 };
 window.changeDate = (o) => {
     const d = new Date(state.currentDate); d.setDate(d.getDate()+o); state.currentDate=d.toISOString().split('T')[0]; init();
 };
+window.renderProfileValues = () => {
+    document.getElementById('manualKcal').value = Math.round(state.user.kcal);
+    document.getElementById('manualProt').value = Math.round(state.user.p);
+    document.getElementById('manualCarb').value = Math.round(state.user.c);
+    document.getElementById('manualFat').value = Math.round(state.user.f);
+};
+window.saveManualGoals = () => {
+    state.user.kcal = parseFloat(document.getElementById('manualKcal').value)||2000;
+    state.user.p = parseFloat(document.getElementById('manualProt').value)||150;
+    state.user.c = parseFloat(document.getElementById('manualCarb').value)||250;
+    state.user.f = parseFloat(document.getElementById('manualFat').value)||70;
+    localStorage.setItem('foodlog_user', JSON.stringify(state.user));
+    renderDashboard(); closeProfile();
+};
+window.calculateGoals = () => {
+    const w = parseFloat(document.getElementById('pWeight').value), h = parseFloat(document.getElementById('pHeight').value), a = parseFloat(document.getElementById('pAge').value), act = parseFloat(document.getElementById('pActivity').value), g = parseFloat(document.getElementById('pGoal').value);
+    if(!w) return;
+    const bmr = (10*w)+(6.25*h)-(5*a)+5; 
+    const kcal = (bmr*act)+g;
+    state.user = { kcal, p: (kcal*0.3)/4, c: (kcal*0.35)/4, f: (kcal*0.35)/9 };
+    localStorage.setItem('foodlog_user', JSON.stringify(state.user));
+    renderProfileValues(); renderDashboard(); closeProfile();
+};
 window.openProfile = () => document.getElementById('profileModal').classList.remove('translate-y-full');
 window.closeProfile = () => document.getElementById('profileModal').classList.add('translate-y-full');
-window.openMicros = () => document.getElementById('microsModal').classList.remove('hidden');
-window.openWorkoutGenModal = () => document.getElementById('workoutModal').classList.remove('translate-y-full');
+window.closeEditModal = () => document.getElementById('editModal').classList.add('hidden');
+window.openMicros = () => {
+    document.getElementById('microsModal').classList.remove('hidden');
+    const logs = state.logs.filter(l=>l.date===state.currentDate);
+    const m={};
+    logs.forEach(l=>{ if(l.micros) Object.keys(l.micros).forEach(k=> m[k]=(m[k]||0)+(l.micros[k]*((l.unit==='g'||l.unit==='ml')?l.qty/100:l.qty))); });
+    document.getElementById('microList').innerHTML = Object.keys(m).length ? Object.keys(m).map(k=>`<div class="flex justify-between border-b border-slate-800 py-2 text-slate-300"><span>${k.replace('_',' ')}</span><span>${Math.round(m[k])}</span></div>`).join('') : '<div class="text-center text-slate-500">No data</div>';
+};
 window.switchTab = (id) => {
     document.querySelectorAll('.view-section').forEach(e => e.classList.remove('active'));
     document.getElementById(id).classList.add('active');
     document.getElementById('fabAdd').style.display = id === 'view-diary' ? 'flex' : 'none';
 };
+window.generateMealPlan = async () => {
+    const ing = document.getElementById('plannerInput').value;
+    if(!ing) return;
+    try {
+        const res = await fetch('/api/plan-meal', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ingredients:ing})});
+        const data = await res.json();
+        document.getElementById('planTitle').innerText = data.mealName;
+        document.getElementById('planRecipe').innerText = data.recipe;
+        document.getElementById('planGrocery').innerHTML = data.groceryList.map(s=>`<li>${s}</li>`).join('');
+        document.getElementById('plannerResult').classList.remove('hidden');
+    } catch(e){}
+};
+window.editExistingLog = (id) => { const l=state.logs.find(x=>x.id===id); if(l) prepFoodForEdit(l, false); };
 
+// Init listeners
+document.getElementById('searchInput').addEventListener('input', (e) => { clearTimeout(window.st); window.st=setTimeout(()=>performSearch(e.target.value), 600); });
 init();
