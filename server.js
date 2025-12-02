@@ -25,6 +25,12 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+// --- HELPER: Clean AI Response ---
+function cleanJSON(text) {
+    if (!text) return null;
+    return text.replace(/```json/g, '').replace(/```/g, '').trim();
+}
+
 // --- HELPER: Extract Micros ---
 function extractMicros(nutriments) {
     if (!nutriments) return {};
@@ -46,12 +52,20 @@ app.post('/api/search', async (req, res) => {
 
     try {
         if (mode === 'barcode') {
-            const url = `https://world.openfoodfacts.org/api/v2/product/${query}.json`;
-            const response = await axios.get(url, { timeout: 4000 });
+            // 1. Try World OFF
+            let url = `https://world.openfoodfacts.org/api/v2/product/${query}.json`;
+            let response = await axios.get(url, { timeout: 4000 });
+            
+            if (response.data.status !== 1) {
+                // 2. Try German OFF if World fails
+                url = `https://de.openfoodfacts.org/api/v2/product/${query}.json`;
+                response = await axios.get(url, { timeout: 4000 });
+            }
+
             if (response.data.status === 1) {
                 const p = response.data.product;
                 return res.json([{
-                    name: p.product_name || "Unknown Product",
+                    name: p.product_name || p.product_name_de || "Unknown Product",
                     brand: p.brands || "",
                     calories: p.nutriments?.['energy-kcal'] || 0,
                     protein: p.nutriments?.proteins || 0,
@@ -93,7 +107,7 @@ app.post('/api/search', async (req, res) => {
                 Strict JSON.`
             }]
         });
-        const content = completion.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
+        const content = cleanJSON(completion.choices[0].message.content);
         const aiItem = JSON.parse(content);
         aiItem.source = 'AI Estimate';
         return res.json([aiItem]);
@@ -103,7 +117,7 @@ app.post('/api/search', async (req, res) => {
     }
 });
 
-// --- API: Parse Ingredients (Multi-Add) ---
+// --- API: Parse Ingredients ---
 app.post('/api/parse-ingredients', async (req, res) => {
     const { text } = req.body;
     try {
@@ -116,7 +130,7 @@ app.post('/api/parse-ingredients', async (req, res) => {
                 Stats should be TOTAL for the specific quantity mentioned.`
             }]
         });
-        const content = completion.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
+        const content = cleanJSON(completion.choices[0].message.content);
         res.json(JSON.parse(content));
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -140,7 +154,7 @@ app.post('/api/vision', upload.single('image'), async (req, res) => {
             max_tokens: 400
         });
         fs.unlinkSync(req.file.path);
-        const content = response.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
+        const content = cleanJSON(response.choices[0].message.content);
         res.json(JSON.parse(content));
     } catch (err) {
         if (req.file) fs.unlinkSync(req.file.path);
@@ -148,7 +162,7 @@ app.post('/api/vision', upload.single('image'), async (req, res) => {
     }
 });
 
-// --- API: Meal Planner ---
+// --- API: Planner ---
 app.post('/api/plan-meal', async (req, res) => {
     const { ingredients } = req.body;
     try {
@@ -159,7 +173,7 @@ app.post('/api/plan-meal', async (req, res) => {
                 content: `Create a meal using: ${ingredients}. Return JSON: { "mealName": String, "recipe": String, "groceryList": [String] }`
             }]
         });
-        const content = completion.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
+        const content = cleanJSON(completion.choices[0].message.content);
         res.json(JSON.parse(content));
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -168,24 +182,27 @@ app.post('/api/plan-meal', async (req, res) => {
 
 // --- API: Workout Generator ---
 app.post('/api/plan-workout', async (req, res) => {
-    const { type, days, recovery, equipment } = req.body;
+    const { type, days, recovery, equipment, level, activity } = req.body;
     try {
         const completion = await openai.chat.completions.create({
             model: "gpt-4o-mini",
             messages: [{
                 role: "system",
-                content: "You are an expert fitness coach. Create structured workout plans."
+                content: "You are an expert fitness coach."
             }, {
                 role: "user",
                 content: `Create a ${days}-day split workout plan.
+                Level: ${level}.
+                Activity Level: ${activity}.
                 Focus: ${type}.
                 Equipment: ${equipment}.
-                User Recovery: ${recovery}% (If low, suggest lighter intensity or deload).
+                Recovery Status: ${recovery}%.
+                For each exercise, provide a very short "form_tip" (max 10 words).
                 Return strictly a JSON array where each object is a Day:
-                [{ "day": "Day 1: Chest", "exercises": [{ "name": "Bench Press", "sets": "3x10", "note": "Focus on form" }] }]`
+                [{ "day": "Day 1: Chest", "exercises": [{ "name": "Bench Press", "sets": "3x10", "form_tip": "Keep core tight" }] }]`
             }]
         });
-        const content = completion.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
+        const content = cleanJSON(completion.choices[0].message.content);
         res.json(JSON.parse(content));
     } catch (err) {
         res.status(500).json({ error: err.message });
