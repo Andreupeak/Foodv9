@@ -26,17 +26,34 @@ app.use(express.static(path.join(__dirname, 'public')));
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // --- HELPER: Extract Micros from OpenFoodFacts ---
-function extractMicros(nutriments) {
-    if (!nutriments) return {};
+// Expanded to try and catch more of the requested list
+function extractMicros(n) {
+    if (!n) return {};
     return {
-        vitamin_a: nutriments['vitamin-a_100g'] || nutriments['vitamin-a_value'] || 0,
-        vitamin_c: nutriments['vitamin-c_100g'] || nutriments['vitamin-c_value'] || 0,
-        vitamin_d: nutriments['vitamin-d_100g'] || nutriments['vitamin-d_value'] || 0,
-        calcium: nutriments['calcium_100g'] || nutriments['calcium_value'] || 0,
-        iron: nutriments['iron_100g'] || nutriments['iron_value'] || 0,
-        zinc: nutriments['zinc_100g'] || nutriments['zinc_value'] || 0,
-        magnesium: nutriments['magnesium_100g'] || nutriments['magnesium_value'] || 0,
-        potassium: nutriments['potassium_100g'] || nutriments['potassium_value'] || 0,
+        vitamin_a: n['vitamin-a_100g'] || n['vitamin-a_value'] || 0,
+        thiamin: n['vitamin-b1_100g'] || n['thiamin_100g'] || 0,
+        riboflavin: n['vitamin-b2_100g'] || n['riboflavin_100g'] || 0,
+        vitamin_b6: n['vitamin-b6_100g'] || 0,
+        vitamin_b12: n['vitamin-b12_100g'] || 0,
+        biotin: n['biotin_100g'] || n['vitamin-b7_100g'] || 0,
+        folic_acid: n['folates_100g'] || n['folic-acid_100g'] || n['vitamin-b9_100g'] || 0,
+        niacin: n['vitamin-pp_100g'] || n['niacin_100g'] || 0,
+        pantothenic_acid: n['pantothenic-acid_100g'] || n['vitamin-b5_100g'] || 0,
+        vitamin_c: n['vitamin-c_100g'] || n['vitamin-c_value'] || 0,
+        vitamin_d: n['vitamin-d_100g'] || n['vitamin-d_value'] || 0,
+        vitamin_e: n['vitamin-e_100g'] || n['vitamin-e_value'] || 0,
+        vitamin_k: n['vitamin-k_100g'] || n['phylloquinone_100g'] || 0,
+        calcium: n['calcium_100g'] || n['calcium_value'] || 0,
+        magnesium: n['magnesium_100g'] || n['magnesium_value'] || 0,
+        zinc: n['zinc_100g'] || n['zinc_value'] || 0,
+        chromium: n['chromium_100g'] || 0,
+        molybdenum: n['molybdenum_100g'] || 0,
+        iodine: n['iodine_100g'] || 0,
+        selenium: n['selenium_100g'] || 0,
+        phosphorus: n['phosphorus_100g'] || 0,
+        manganese: n['manganese_100g'] || 0,
+        iron: n['iron_100g'] || n['iron_value'] || 0,
+        copper: n['copper_100g'] || 0
     };
 }
 
@@ -44,6 +61,7 @@ function extractMicros(nutriments) {
 app.post('/api/search', async (req, res) => {
     const { query, mode } = req.body;
 
+    // 1. OPEN FOOD FACTS
     try {
         let url;
         if (mode === 'barcode') {
@@ -84,7 +102,7 @@ app.post('/api/search', async (req, res) => {
         return res.status(404).json({ error: 'Barcode not found' });
     }
 
-    // AI Fallback
+    // 3. AI FALLBACK
     try {
         console.log(`Using AI fallback for: ${query}`);
         const completion = await openai.chat.completions.create({
@@ -92,8 +110,9 @@ app.post('/api/search', async (req, res) => {
             messages: [{
                 role: "user",
                 content: `User searched for "${query}". It was not found in the database. 
-                Return a JSON object for 1 standard serving (or 100g if generic) of this item.
-                Include: name, calories, protein, carbs, fat, and estimated micros (vitamin_a, vitamin_c, vitamin_d, calcium, iron, zinc, magnesium, potassium) in standard units (mg/ug).
+                Return a JSON object for 1 standard serving (or 100g if generic).
+                Include name, calories, protein, carbs, fat.
+                Also estimate these micros if applicable (mg/ug): vitamin_a, thiamin, riboflavin, vitamin_b6, vitamin_b12, biotin, folic_acid, niacin, pantothenic_acid, vitamin_c, vitamin_d, vitamin_e, vitamin_k, calcium, magnesium, zinc, chromium, molybdenum, iodine, selenium, phosphorus, manganese, iron, copper.
                 Response format: { "name":Str, "base_qty":Num, "unit":Str, "calories":Num, "protein":Num, "carbs":Num, "fat":Num, "micros":{...} }
                 Strict JSON only.`
             }]
@@ -109,7 +128,7 @@ app.post('/api/search', async (req, res) => {
     }
 });
 
-// --- API: Analyze Ingredients (New Feature 2) ---
+// --- API: Analyze Ingredients (UPDATED) ---
 app.post('/api/analyze', async (req, res) => {
     const { text } = req.body;
     try {
@@ -117,22 +136,22 @@ app.post('/api/analyze', async (req, res) => {
             model: "gpt-4o-mini",
             messages: [{
                 role: "system",
-                content: "You are a nutrition analyzer. Calculate total nutrition for the provided list of ingredients."
+                content: "You are a nutrition analyzer. Break down the input into individual ingredients with nutrition info."
             }, {
                 role: "user",
                 content: `Analyze this list: "${text}".
-                Return a single JSON object summing up all ingredients:
-                { "name": "Combined Meal/Ingredients", "calories": TotalNum, "protein": TotalNum, "carbs": TotalNum, "fat": TotalNum, "micros": { "vitamin_a":Num, "vitamin_c":Num, "calcium":Num, "iron":Num, "zinc":Num } }.
+                Return a JSON object containing an array called "items". 
+                Each item should represent one ingredient from the list with its nutrition for the specified quantity.
+                Include Name, Qty, Unit, Kcal, P, C, F.
+                Also include "micros" object with estimated: vitamin_a, thiamin, riboflavin, vitamin_b6, vitamin_b12, biotin, folic_acid, niacin, pantothenic_acid, vitamin_c, vitamin_d, vitamin_e, vitamin_k, calcium, magnesium, zinc, chromium, molybdenum, iodine, selenium, phosphorus, manganese, iron, copper.
+                
+                JSON Format: { "items": [ { "name":Str, "qty":Num, "unit":Str, "calories":Num, "protein":Num, "carbs":Num, "fat":Num, "micros":{...} }, ... ] }
                 Strict JSON only. No markdown.`
             }]
         });
         const content = completion.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
         const data = JSON.parse(content);
-        // Set base_qty to 100 so frontend editing logic works nicely (treated as 1 portion = 100 units internal)
-        data.base_qty = 1; 
-        data.unit = 'portion';
-        data.source = 'AI Analysis';
-        res.json(data);
+        res.json(data); // Returns { items: [...] }
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -173,10 +192,10 @@ app.post('/api/vision', upload.single('image'), async (req, res) => {
                 role: 'user',
                 content: [
                     { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } },
-                    { type: 'text', text: 'Identify food & estimate portion. Return JSON: { "name":Str, "estimated_weight_g":Num, "calories":Num, "protein":Num, "carbs":Num, "fat":Num, "micros": { "vitamin_a":Num, "vitamin_c":Num, "calcium":Num, "iron":Num } }. Values for WHOLE portion.' }
+                    { type: 'text', text: 'Identify food & estimate portion. Return JSON: { "name":Str, "estimated_weight_g":Num, "calories":Num, "protein":Num, "carbs":Num, "fat":Num, "micros": { ...include all major vitamins and minerals... } }. Values for WHOLE portion.' }
                 ]
             }],
-            max_tokens: 400
+            max_tokens: 500
         });
 
         fs.unlinkSync(req.file.path);
