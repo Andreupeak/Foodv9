@@ -659,13 +659,25 @@ window.changeDate = (offset) => {
     init();
 };
 
+
 window.exportCSV = () => {
     const headers = [
         'Date', 'Meal', 'Name', 'Qty', 'Unit', 'Calories (kcal)', 'Protein (g)', 'Carbs (g)', 'Fat (g)',
         ...MICRO_KEYS
     ];
 
-    const rows = state.logs.map(l => {
+    // SAFETY BUFFER: Export logs from the last 7 days + today
+    // This allows the Shortcut to check for duplicates and fill in any missing days
+    const today = new Date();
+    const pastDate = new Date();
+    pastDate.setDate(today.getDate() - 7); // Go back 7 days
+
+    const recentLogs = state.logs.filter(l => {
+        const logDate = new Date(l.date);
+        return logDate >= pastDate;
+    });
+
+    const rows = recentLogs.map(l => {
         const factor = (l.unit === 'g' || l.unit === 'ml') ? (l.qty / 100) : l.qty;
 
         const microValues = MICRO_KEYS.map(k => {
@@ -673,7 +685,7 @@ window.exportCSV = () => {
             return Math.round(val * 100) / 100;
         });
 
-        // <--- NEW: Use timestamp if available, otherwise fallback to date
+        // Use exact timestamp if available, else date
         const timeLog = l.timestamp ? l.timestamp : l.date;
 
         return [
@@ -697,11 +709,17 @@ window.exportCSV = () => {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `foodlog_export_${state.currentDate}.csv`);
+    // Filename now indicates it is a recent batch export
+    link.setAttribute("download", `foodlog_recent_export_${state.currentDate}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
 };
+
+
+
+
+
 
 
 
