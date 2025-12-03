@@ -416,6 +416,7 @@ window.saveLog = function() {
     const log = {
         id: state.tempFood.isNew ? Math.random().toString(36).substr(2, 9) : state.tempFood.id,
         date: state.currentDate,
+        timestamp: new Date().toISOString(), // <--- NEW: Saves exact date & time
         meal: meal,
         name: state.tempFood.name,
         qty, unit,
@@ -434,19 +435,23 @@ window.saveLog = function() {
         state.logs.push(log);
     } else {
         const idx = state.logs.findIndex(l => l.id === log.id);
-        if (idx !== -1) state.logs[idx] = log;
+        if (idx !== -1) {
+            // Preserve original timestamp if editing an existing item
+            if (state.logs[idx].timestamp) log.timestamp = state.logs[idx].timestamp;
+            state.logs[idx] = log;
+        }
     }
 
     localStorage.setItem('foodlog_logs', JSON.stringify(state.logs));
     closeEditModal();
     
-    // Feature 3: Don't close main modal if we are in 'analyze' flow
     if (state.activeTab !== 'analyze') {
         document.getElementById('addModal').classList.add('translate-y-full');
     }
     
     init();
 };
+
 
 window.deleteLog = function() {
     if (!state.tempFood || state.tempFood.isNew) return;
@@ -655,27 +660,26 @@ window.changeDate = (offset) => {
 };
 
 window.exportCSV = () => {
-    // We define the headers to include macros + all tracked micros
     const headers = [
         'Date', 'Meal', 'Name', 'Qty', 'Unit', 'Calories (kcal)', 'Protein (g)', 'Carbs (g)', 'Fat (g)',
         ...MICRO_KEYS
     ];
 
     const rows = state.logs.map(l => {
-        // Calculate factor to normalize micros to the actual logged quantity
         const factor = (l.unit === 'g' || l.unit === 'ml') ? (l.qty / 100) : l.qty;
 
-        // Map micros ensuring we handle missing data gracefully
         const microValues = MICRO_KEYS.map(k => {
             const val = l.micros && l.micros[k] ? l.micros[k] * factor : 0;
-            return Math.round(val * 100) / 100; // Round to 2 decimals
+            return Math.round(val * 100) / 100;
         });
 
-        // Combine standard log data with calculated micros
+        // <--- NEW: Use timestamp if available, otherwise fallback to date
+        const timeLog = l.timestamp ? l.timestamp : l.date;
+
         return [
-            l.date, 
+            timeLog, 
             l.meal, 
-            `"${l.name.replace(/"/g, '""')}"`, // Escape quotes in names
+            `"${l.name.replace(/"/g, '""')}"`,
             l.qty, 
             l.unit, 
             l.calories, 
@@ -686,14 +690,11 @@ window.exportCSV = () => {
         ];
     });
 
-    // Combine headers and rows
     const csvContent = "data:text/csv;charset=utf-8," 
         + headers.join(",") + "\n" 
         + rows.map(e => e.join(",")).join("\n");
 
     const encodedUri = encodeURI(csvContent);
-    
-    // Create a temporary link to force a download with a specific filename
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
     link.setAttribute("download", `foodlog_export_${state.currentDate}.csv`);
@@ -701,5 +702,8 @@ window.exportCSV = () => {
     link.click();
     document.body.removeChild(link);
 };
+
+
+
 
 init();
