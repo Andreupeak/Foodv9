@@ -669,103 +669,86 @@ window.changeDate = (offset) => {
 };
 
 window.exportJSON = () => {
-    // 1. Filter for logs from today only (to avoid duplicates easily)
-    // Or keep your logic for "recent logs" if you prefer.
-    const today = new Date().toISOString().split('T')[0];
-    const logsToExport = state.logs.filter(l => l.date === today);
+    // 1. Filter logs (Last 7 days + Today)
+    const today = new Date();
+    const pastDate = new Date();
+    pastDate.setDate(today.getDate() - 7); 
 
-    if (logsToExport.length === 0) return alert("No logs for today.");
+    const recentLogs = state.logs.filter(l => {
+        const logDate = new Date(l.date);
+        return logDate >= pastDate;
+    });
 
-    // 2. Aggregate totals (Sum everything up)
-    // Sending one big "Total" for the day is often safer for HealthKit 
-    // than hundreds of small entries which can get messy.
-    let totals = {
-        // Macros
-        "Dietary Energy": 0,
-        "Protein": 0,
-        "Carbohydrates": 0,
-        "Total Fat": 0,
-        
-        // Micros (Mapping to Apple Health Types)
-        "Vitamin A": 0,
-        "Thiamin": 0,       // Vitamin B1
-        "Riboflavin": 0,    // Vitamin B2
-        "Niacin": 0,        // Vitamin B3
-        "Pantothenic Acid": 0, // Vitamin B5
-        "Vitamin B6": 0,
-        "Biotin": 0,        // Vitamin B7
-        "Folate": 0,        // Folic Acid / Vitamin B9
-        "Vitamin B12": 0,
-        "Vitamin C": 0,
-        "Vitamin D": 0,
-        "Vitamin E": 0,
-        "Vitamin K": 0,
-        "Calcium": 0,
-        "Iron": 0,
-        "Magnesium": 0,
-        "Phosphorus": 0,
-        "Potassium": 0,
-        "Sodium": 0,
-        "Zinc": 0,
-        "Copper": 0,
-        "Manganese": 0,
-        "Selenium": 0,
-        "Iodine": 0,
-        // "Chromium": 0, // Apple Health often doesn't track Chromium/Molybdenum standardly
-        // "Molybdenum": 0 
-    };
+    if (recentLogs.length === 0) return alert("No recent logs found.");
 
-    logsToExport.forEach(l => {
+    // 2. Prepare the List
+    const exportData = recentLogs.map((l, index) => {
         const factor = (l.unit === 'g' || l.unit === 'ml') ? (l.qty / 100) : l.qty;
         
-        // Macros
-        totals["Dietary Energy"] += (l.calories || 0);
-        totals["Protein"] += (l.protein || 0);
-        totals["Carbohydrates"] += (l.carbs || 0);
-        totals["Total Fat"] += (l.fat || 0);
+        // Ensure unique ISO timestamp
+        let uniqueTime = l.timestamp || `${l.date}T12:00:${String(index % 60).padStart(2, '0')}.000Z`;
 
-        // Micros
+        const item = {
+            "Date": uniqueTime,
+            "Name": l.name,
+            
+            // Macros
+            "Dietary Energy": Math.round(l.calories || 0),
+            "Protein": Math.round((l.protein || 0) * 10) / 10,
+            "Carbohydrates": Math.round((l.carbs || 0) * 10) / 10,
+            "Total Fat": Math.round((l.fat || 0) * 10) / 10,
+        };
+
+        // 3. Add Micros (Full List)
         if (l.micros) {
-            totals["Vitamin A"] += (l.micros.vitamin_a || 0) * factor;
-            totals["Thiamin"] += (l.micros.thiamin || 0) * factor;
-            totals["Riboflavin"] += (l.micros.riboflavin || 0) * factor;
-            totals["Niacin"] += (l.micros.niacin || 0) * factor;
-            totals["Pantothenic Acid"] += (l.micros.pantothenic_acid || 0) * factor;
-            totals["Vitamin B6"] += (l.micros.vitamin_b6 || 0) * factor;
-            totals["Biotin"] += (l.micros.biotin || 0) * factor;
-            totals["Folate"] += (l.micros.folic_acid || 0) * factor;
-            totals["Vitamin B12"] += (l.micros.vitamin_b12 || 0) * factor;
-            totals["Vitamin C"] += (l.micros.vitamin_c || 0) * factor;
-            totals["Vitamin D"] += (l.micros.vitamin_d || 0) * factor;
-            totals["Vitamin E"] += (l.micros.vitamin_e || 0) * factor;
-            totals["Vitamin K"] += (l.micros.vitamin_k || 0) * factor;
-            totals["Calcium"] += (l.micros.calcium || 0) * factor;
-            totals["Iron"] += (l.micros.iron || 0) * factor;
-            totals["Magnesium"] += (l.micros.magnesium || 0) * factor;
-            totals["Phosphorus"] += (l.micros.phosphorus || 0) * factor;
-            totals["Zinc"] += (l.micros.zinc || 0) * factor;
-            totals["Copper"] += (l.micros.copper || 0) * factor;
-            totals["Manganese"] += (l.micros.manganese || 0) * factor;
-            totals["Selenium"] += (l.micros.selenium || 0) * factor;
-            totals["Iodine"] += (l.micros.iodine || 0) * factor;
+            const m = l.micros;
+            const microMap = {
+                "Vitamin A": m.vitamin_a,
+                "Thiamin": m.thiamin,
+                "Riboflavin": m.riboflavin,
+                "Niacin": m.niacin,
+                "Pantothenic Acid": m.pantothenic_acid,
+                "Vitamin B6": m.vitamin_b6,
+                "Biotin": m.biotin,
+                "Folate": m.folic_acid,
+                "Vitamin B12": m.vitamin_b12,
+                "Vitamin C": m.vitamin_c,
+                "Vitamin D": m.vitamin_d,
+                "Vitamin E": m.vitamin_e,
+                "Vitamin K": m.vitamin_k,
+                "Calcium": m.calcium,
+                "Iron": m.iron,
+                "Magnesium": m.magnesium,
+                "Phosphorus": m.phosphorus,
+                "Zinc": m.zinc,
+                "Copper": m.copper,
+                "Manganese": m.manganese,
+                "Selenium": m.selenium,
+                "Iodine": m.iodine,
+                "Chromium": m.chromium,       // Added back
+                "Molybdenum": m.molybdenum    // Added back
+            };
+
+            for (const [key, val] of Object.entries(microMap)) {
+                if (val > 0) {
+                    item[key] = Math.round((val * factor) * 100) / 100;
+                }
+            }
         }
+        return item;
     });
 
-    // Remove zero values to clean up the export
-    Object.keys(totals).forEach(key => {
-        if (totals[key] <= 0) delete totals[key];
-    });
-
-    const jsonString = JSON.stringify(totals, null, 2);
+    // 4. Share as Text
+    const jsonString = JSON.stringify(exportData, null, 2);
 
     if (navigator.share) {
         navigator.share({
-            title: `FoodLog ${today}`,
+            title: 'FoodLog Pro Export',
             text: jsonString
         }).catch(console.error);
     } else {
         console.log(jsonString);
-        alert("Check console for data (Desktop fallback)");
+        alert("Data logged to console (Desktop mode)");
     }
 };
 
