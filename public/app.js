@@ -405,6 +405,7 @@ function updateEditPreview() {
     document.getElementById('editFat').innerText = Math.round(state.tempFood.baseFat * factor);
 }
 
+
 window.saveLog = function() {
     const qty = parseFloat(document.getElementById('editQty').value);
     const unit = document.getElementById('editUnit').value;
@@ -413,10 +414,18 @@ window.saveLog = function() {
     
     state.selectedMeal = meal;
 
+    // GENERATE UNIQUE TIMESTAMP
+    // We add a random number (0-999) to the milliseconds to ensure no two logs 
+    // have the exact same time, even if created in the same second.
+    const now = new Date();
+    now.setMilliseconds(now.getMilliseconds() + Math.floor(Math.random() * 999));
+    const uniqueTimestamp = now.toISOString();
+
     const log = {
         id: state.tempFood.isNew ? Math.random().toString(36).substr(2, 9) : state.tempFood.id,
         date: state.currentDate,
-        timestamp: new Date().toISOString(), // <--- NEW: Saves exact date & time
+        // Use existing timestamp if editing, otherwise use new unique one
+        timestamp: (state.tempFood.isNew || !state.tempFood.timestamp) ? uniqueTimestamp : state.tempFood.timestamp,
         meal: meal,
         name: state.tempFood.name,
         qty, unit,
@@ -436,7 +445,7 @@ window.saveLog = function() {
     } else {
         const idx = state.logs.findIndex(l => l.id === log.id);
         if (idx !== -1) {
-            // Preserve original timestamp if editing an existing item
+            // Keep original timestamp to prevent duplicating edits in Health
             if (state.logs[idx].timestamp) log.timestamp = state.logs[idx].timestamp;
             state.logs[idx] = log;
         }
@@ -659,25 +668,23 @@ window.changeDate = (offset) => {
     init();
 };
 
-
 window.exportCSV = () => {
     const headers = [
         'Date', 'Meal', 'Name', 'Qty', 'Unit', 'Calories (kcal)', 'Protein (g)', 'Carbs (g)', 'Fat (g)',
         ...MICRO_KEYS
     ];
 
-    // SAFETY BUFFER: Export logs from the last 7 days + today
-    // This allows the Shortcut to check for duplicates and fill in any missing days
+    // Export last 7 days + today
     const today = new Date();
     const pastDate = new Date();
-    pastDate.setDate(today.getDate() - 7); // Go back 7 days
+    pastDate.setDate(today.getDate() - 7); 
 
     const recentLogs = state.logs.filter(l => {
         const logDate = new Date(l.date);
         return logDate >= pastDate;
     });
 
-    const rows = recentLogs.map(l => {
+    const rows = recentLogs.map((l, index) => {
         const factor = (l.unit === 'g' || l.unit === 'ml') ? (l.qty / 100) : l.qty;
 
         const microValues = MICRO_KEYS.map(k => {
@@ -685,8 +692,18 @@ window.exportCSV = () => {
             return Math.round(val * 100) / 100;
         });
 
-        // Use exact timestamp if available, else date
-        const timeLog = l.timestamp ? l.timestamp : l.date;
+        // TIME LOGIC:
+        // 1. Use saved timestamp if it exists.
+        // 2. If no timestamp (old log), create a fake one based on the date.
+        // 3. Add 'index' to seconds to ensure every row has a different time.
+        let timeLog;
+        if (l.timestamp) {
+            timeLog = l.timestamp;
+        } else {
+            // Create fake time: 12:00:00 + index seconds
+            // This ensures even old logs have unique seconds
+            timeLog = `${l.date}T12:00:${String(index % 60).padStart(2, '0')}.000Z`;
+        }
 
         return [
             timeLog, 
@@ -709,19 +726,11 @@ window.exportCSV = () => {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    // Filename now indicates it is a recent batch export
-    link.setAttribute("download", `foodlog_recent_export_${state.currentDate}.csv`);
+    link.setAttribute("download", `foodlog_export_${state.currentDate}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
 };
-
-
-
-
-
-
-
 
 
 init();
