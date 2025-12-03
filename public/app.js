@@ -668,13 +668,8 @@ window.changeDate = (offset) => {
     init();
 };
 
-window.exportCSV = () => {
-    const headers = [
-        'Date', 'Meal', 'Name', 'Qty', 'Unit', 'Calories (kcal)', 'Protein (g)', 'Carbs (g)', 'Fat (g)',
-        ...MICRO_KEYS
-    ];
-
-    // Export last 7 days + today
+window.exportJSON = () => {
+    // 1. Filter for recent logs (last 7 days + today) to allow duplicate checking
     const today = new Date();
     const pastDate = new Date();
     pastDate.setDate(today.getDate() - 7); 
@@ -684,49 +679,40 @@ window.exportCSV = () => {
         return logDate >= pastDate;
     });
 
-    const rows = recentLogs.map((l, index) => {
+    // 2. Format data specifically for Apple Shortcuts
+    const exportData = recentLogs.map((l, index) => {
         const factor = (l.unit === 'g' || l.unit === 'ml') ? (l.qty / 100) : l.qty;
+        
+        // Ensure time is unique (add index to seconds if needed)
+        // If timestamp exists, use it. If not, generate a fake one.
+        let uniqueTime = l.timestamp || `${l.date}T12:00:${String(index % 60).padStart(2, '0')}.000Z`;
+        
+        // Build a clean object with numbers already rounded
+        const item = {
+            date: uniqueTime,
+            name: l.name,
+            calories: Math.round(l.calories),
+            protein: Math.round(l.protein * 10) / 10,
+            carbs: Math.round(l.carbs * 10) / 10,
+            fat: Math.round(l.fat * 10) / 10
+        };
 
-        const microValues = MICRO_KEYS.map(k => {
-            const val = l.micros && l.micros[k] ? l.micros[k] * factor : 0;
-            return Math.round(val * 100) / 100;
+        // Add micros only if they exist (prevents sending nulls)
+        MICRO_KEYS.forEach(key => {
+            if (l.micros && l.micros[key]) {
+                // Use the exact key names from your app (e.g., "vitamin_c")
+                item[key] = Math.round((l.micros[key] * factor) * 100) / 100;
+            }
         });
 
-        // TIME LOGIC:
-        // 1. Use saved timestamp if it exists.
-        // 2. If no timestamp (old log), create a fake one based on the date.
-        // 3. Add 'index' to seconds to ensure every row has a different time.
-        let timeLog;
-        if (l.timestamp) {
-            timeLog = l.timestamp;
-        } else {
-            // Create fake time: 12:00:00 + index seconds
-            // This ensures even old logs have unique seconds
-            timeLog = `${l.date}T12:00:${String(index % 60).padStart(2, '0')}.000Z`;
-        }
-
-        return [
-            timeLog, 
-            l.meal, 
-            `"${l.name.replace(/"/g, '""')}"`,
-            l.qty, 
-            l.unit, 
-            l.calories, 
-            l.protein, 
-            l.carbs, 
-            l.fat, 
-            ...microValues
-        ];
+        return item;
     });
 
-    const csvContent = "data:text/csv;charset=utf-8," 
-        + headers.join(",") + "\n" 
-        + rows.map(e => e.join(",")).join("\n");
-
-    const encodedUri = encodeURI(csvContent);
+    // 3. Trigger Download
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData));
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `foodlog_export_${state.currentDate}.csv`);
+    link.setAttribute("href", dataStr);
+    link.setAttribute("download", `foodlog_export_${state.currentDate}.json`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
