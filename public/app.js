@@ -797,7 +797,6 @@ window.changeDate = (offset) => {
 };
 
 window.exportJSON = () => {
-    // 1. Filter for recent logs (last 7 days + today)
     const today = new Date();
     const pastDate = new Date();
     pastDate.setDate(today.getDate() - 7); 
@@ -807,17 +806,23 @@ window.exportJSON = () => {
         return logDate >= pastDate;
     });
 
-    // 2. Format data specifically for Apple Shortcuts
     const exportData = recentLogs.map((l, index) => {
         const factor = (l.unit === 'g' || l.unit === 'ml') ? (l.qty / 100) : l.qty;
         
-        // Ensure strictly unique timestamp for deduplication
-        // If the log has a saved timestamp, use it.
-        // If not, generate one based on the date + index to ensure uniqueness.
-        let uniqueTime = l.timestamp || `${l.date}T12:00:${String(index % 60).padStart(2, '0')}.000Z`;
+        let dateObj;
+        if (l.timestamp) {
+            dateObj = new Date(l.timestamp);
+        } else {
+            dateObj = new Date(l.date); 
+            dateObj.setHours(12, 0, 0, 0); 
+            dateObj.setSeconds(index % 60); 
+        }
+
+        // Unix Timestamp (Seconds)
+        const unixSeconds = Math.floor(dateObj.getTime() / 1000);
 
         const item = {
-            date: uniqueTime,
+            date: unixSeconds,
             name: l.name,
             calories: Math.round(l.calories),
             protein: Math.round(l.protein * 10) / 10,
@@ -825,7 +830,6 @@ window.exportJSON = () => {
             fat: Math.round(l.fat * 10) / 10
         };
         
-        // Add micros only if they exist
         MICRO_KEYS.forEach(key => {
             if (l.micros && l.micros[key]) {
                 item[key] = Math.round((l.micros[key] * factor) * 100) / 100;
@@ -835,8 +839,10 @@ window.exportJSON = () => {
         return item;
     });
 
-    // 3. Trigger Download
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData));
+    // --- THE FIX: Wrap the array in an object ---
+    const finalOutput = { "logs": exportData };
+
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(finalOutput));
     const link = document.createElement("a");
     link.setAttribute("href", dataStr);
     link.setAttribute("download", `foodlog_sync.json`);
