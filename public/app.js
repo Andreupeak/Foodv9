@@ -692,10 +692,7 @@ function handleScanSuccess(text, controls) {
     if(controls) controls.stop();
     stopScanner();
 
-    // 2. Play Beep (Feedback)
-    const audio = new Audio('https://www.soundjay.com/buttons/beep-01a.mp3');
-    audio.volume = 0.5;
-    audio.play().catch(e => {}); // Ignore auto-play errors
+   
 
     // 3. Perform Search
     document.getElementById('searchInput').value = text;
