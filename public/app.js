@@ -809,20 +809,24 @@ window.exportJSON = () => {
     const exportData = recentLogs.map((l, index) => {
         const factor = (l.unit === 'g' || l.unit === 'ml') ? (l.qty / 100) : l.qty;
         
+        // 1. Create a Reliable Date Object
         let dateObj;
         if (l.timestamp) {
             dateObj = new Date(l.timestamp);
         } else {
+            // Fallback: Create noon timestamp for logs that miss it
             dateObj = new Date(l.date); 
             dateObj.setHours(12, 0, 0, 0); 
+            // Add seconds based on index to avoid exact duplicate times
             dateObj.setSeconds(index % 60); 
         }
 
-        // Unix Timestamp (Seconds)
-        const unixSeconds = Math.floor(dateObj.getTime() / 1000);
+        // 2. EXPORT AS ISO STRING (Text)
+        // Shortcuts loves this format (e.g., "2023-12-05T12:00:00.000Z")
+        const dateString = dateObj.toISOString();
 
         const item = {
-            date: unixSeconds,
+            date: dateString, // Sending TEXT now
             name: l.name,
             calories: Math.round(l.calories),
             protein: Math.round(l.protein * 10) / 10,
@@ -839,7 +843,7 @@ window.exportJSON = () => {
         return item;
     });
 
-    // --- THE FIX: Wrap the array in an object ---
+    // Wrap in object to satisfy Shortcuts "Get Dictionary" requirements
     const finalOutput = { "logs": exportData };
 
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(finalOutput));
@@ -850,6 +854,5 @@ window.exportJSON = () => {
     link.click();
     document.body.removeChild(link);
 };
-
 
 init();
