@@ -586,20 +586,46 @@ window.generateMealPlan = async function() {
 };
 
 // --- SCANNER FIX ---
-let html5QrcodeScanner;
+let html5QrcodeScanner = null;
+
 window.startScanner = function() {
-    document.getElementById('scanner-container').classList.remove('hidden');
+    const container = document.getElementById('scanner-container');
+    container.classList.remove('hidden');
+    container.innerHTML = ''; // Clear previous instances
+
+    // Add a close button specifically for the scanner
+    const closeBtn = document.createElement('button');
+    closeBtn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+    closeBtn.className = "absolute top-2 right-2 z-20 bg-black/50 text-white w-8 h-8 rounded-full flex items-center justify-center";
+    closeBtn.onclick = stopScanner;
+    container.appendChild(closeBtn);
+
     if(html5QrcodeScanner) { 
-        html5QrcodeScanner.clear();
-        html5QrcodeScanner = null;
+        // Ensure previous instance is cleared
+        try { html5QrcodeScanner.clear(); } catch(e){}
     }
+
     html5QrcodeScanner = new Html5Qrcode("scanner-container");
-    const config = { fps: 15, qrbox: { width: 250, height: 150 }, aspectRatio: 1.0 };
     
-    html5QrcodeScanner.start({ facingMode: "environment" }, config, (decodedText) => {
-        html5QrcodeScanner.stop().then(() => {
-            document.getElementById('scanner-container').classList.add('hidden');
+    // Improved Config for Reliability
+    const config = { 
+        fps: 10, 
+        qrbox: { width: 250, height: 150 }, 
+        aspectRatio: 1.0,
+        experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true
+        }
+    };
+    
+    html5QrcodeScanner.start(
+        { facingMode: "environment" }, 
+        config, 
+        (decodedText) => {
+            // Success Callback
+            stopScanner(); // Stop camera immediately on success
             performSearch(decodedText);
+            
+            // Trigger backend search
             fetch('/api/search', {
                  method: 'POST',
                  headers: {'Content-Type': 'application/json'},
@@ -611,8 +637,39 @@ window.startScanner = function() {
                     alert("Product not found. Try searching by name.");
                 }
             });
+        }, 
+        (errorMessage) => {
+            // Parse error, ignore to avoid console spam
+        }
+    ).catch(err => {
+        container.classList.add('hidden');
+        alert("Camera error: " + err);
+    });
+};
+
+window.stopScanner = function() {
+    if (html5QrcodeScanner) {
+        html5QrcodeScanner.stop().then(() => {
+            html5QrcodeScanner.clear();
+            document.getElementById('scanner-container').classList.add('hidden');
+            html5QrcodeScanner = null;
+        }).catch(err => {
+            console.error("Failed to stop scanner", err);
+            // Force hide if stop fails
+            document.getElementById('scanner-container').classList.add('hidden');
+            document.getElementById('scanner-container').innerHTML = '';
+            html5QrcodeScanner = null;
         });
-    }, (err) => {});
+    } else {
+        document.getElementById('scanner-container').classList.add('hidden');
+    }
+};
+
+// Update closeAddModal to ensure scanner stops
+const originalCloseAddModal = window.closeAddModal;
+window.closeAddModal = function() {
+    stopScanner();
+    originalCloseAddModal();
 };
 
 // --- VISION ---
