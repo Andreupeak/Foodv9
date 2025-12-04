@@ -413,11 +413,22 @@ window.saveLog = function() {
     const factor = (unit === 'g' || unit === 'ml') ? qty / 100 : qty;
     
     state.selectedMeal = meal;
+    
 
-    // GENERATE UNIQUE TIMESTAMP
-    // We add a random number (0-999) to the milliseconds to ensure no two logs 
-    // have the exact same time, even if created in the same second.
+    // GENERATE CORRECT TIMESTAMP
+    // We take the currently selected date (state.currentDate)
+    const logDate = new Date(state.currentDate);
     const now = new Date();
+    
+    // We keep the current "Wall Clock" time (hours/min/sec) to preserve the order of entry,
+    // but we force the Year/Month/Day to match the selected date.
+    logDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+    
+    // Add random milliseconds to ensure uniqueness
+    logDate.setMilliseconds(logDate.getMilliseconds() + Math.floor(Math.random() * 999));
+    
+    const uniqueTimestamp = logDate.toISOString();
+
     now.setMilliseconds(now.getMilliseconds() + Math.floor(Math.random() * 999));
     const uniqueTimestamp = now.toISOString();
 
