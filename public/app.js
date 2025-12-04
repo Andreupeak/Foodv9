@@ -607,71 +607,135 @@ window.generateMealPlan = async function() {
     document.getElementById('plannerInput').disabled = false;
 };
 
-// --- SCANNER LOGIC (IMPROVED) ---
-let html5QrcodeScanner;
 
-window.startScanner = function() {
+// --- PRO SCANNER IMPLEMENTATION (ZXing) ---
+let codeReader = null;
+let currentStream = null;
+
+window.startScanner = async function() {
     const container = document.getElementById('scanner-container');
     container.classList.remove('hidden');
-    
-    // If scanner instance exists, just return (already running)
-    if(html5QrcodeScanner) return;
-    
-    // Improved Config: Use native barcode detector if available (much faster)
-    html5QrcodeScanner = new Html5Qrcode("scanner-container");
-    const config = { 
-        fps: 10, 
-        qrbox: { width: 250, height: 150 }, 
-        aspectRatio: 1.0,
-        experimentalFeatures: {
-            useBarCodeDetectorIfSupported: true
-        }
-    };
-    
-    html5QrcodeScanner.start(
-        { facingMode: "environment" }, 
-        config, 
-        (decodedText) => {
-            // SUCCESS
-            stopScanner(); // Stop immediately on success
-            
-            // Show loading in search
-            document.getElementById('searchInput').value = decodedText;
-            performSearch(decodedText); 
-            
-            // Specifically trigger barcode search mode on backend
-            fetch('/api/search', {
-                 method: 'POST',
-                 headers: {'Content-Type': 'application/json'},
-                 body: JSON.stringify({ query: decodedText, mode: 'barcode' })
-            }).then(r => r.json()).then(data => {
-                if(data.length > 0) {
-                    prepFoodForEdit(data[0], true);
-                } else {
-                    alert("Product not found. Try searching by name.");
-                }
-            });
-        }, 
-        (err) => {
-            // Ignore scan failures (happens every frame)
-        }
-    ).catch(err => {
-        container.innerHTML = '<div class="text-red-400 p-4">Camera Error</div>';
-    });
-};
+    container.innerHTML = `
+        <video id="video" style="width:100%; height:100%; object-fit:cover;" autoplay muted playsinline></video>
+        <div class="absolute inset-0 border-2 border-red-500/50 pointer-events-none" style="top:20%; bottom:20%; left:10%; right:10%;"></div>
+        <div class="absolute bottom-2 left-0 right-0 text-center text-xs text-white bg-black/50 p-1">Align barcode in box</div>
+    `;
 
-window.stopScanner = function() {
-    if (html5QrcodeScanner) {
-        html5QrcodeScanner.stop().then(() => {
-            html5QrcodeScanner.clear();
-            html5QrcodeScanner = null;
-            document.getElementById('scanner-container').classList.add('hidden');
-        }).catch(err => {
-            console.log("Failed to stop scanner", err);
-            html5QrcodeScanner = null; // Force null
-        });
+    // 1. Initialize Reader
+    if (!codeReader) {
+        codeReader = new ZXingBrowser.BrowserMultiFormatReader();
+    }
+
+    try {
+        // 2. Select Camera (Environment/Back Camera)
+        const videoInputDevices = await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
+        const selectedDeviceId = videoInputDevices.find(device => device.label.toLowerCase().includes('back'))?.deviceId 
+                                || videoInputDevices[0].deviceId;
+
+        // 3. Configure Hints (Optimize for 1D Barcodes)
+        const hints = new Map();
+        const formats = [
+            ZXing.BarcodeFormat.EAN_13, // Standard EU Food
+            ZXing.BarcodeFormat.EAN_8,  // Small EU Food
+            ZXing.BarcodeFormat.UPC_A,  // US Food
+            ZXing.BarcodeFormat.UPC_E,  // Small US Food
+            ZXing.BarcodeFormat.CODE_128 // Some logistics tags
+        ];
+        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+        hints.set(ZXing.DecodeHintType.TRY_HARDER, true); // Deep scan (essential for barcodes)
+
+        // 4. Start Decoding with High Resolution Constraints
+        // We force 1280x720 (720p) or higher. 480p is too blurry for barcodes.
+        const controls = await codeReader.decodeFromVideoDevice(
+            selectedDeviceId, 
+            'video', 
+            (result, err, controls) => {
+                if (result) {
+                    // SUCCESS
+                    handleScanSuccess(result.text, controls);
+                }
+                // Note: 'err' is thrown every frame no code is found. We ignore it.
+            },
+            {
+                hints: hints,
+                timeBetweenScansMillis: 200 // Prevent CPU overheating
+            }
+        );
+
+        // Store controls to stop later
+        window.activeScannerControls = controls;
+
+        // 5. Apply Focus Constraints (Critical for Barcodes)
+        // We try to access the active track and force autofocus
+        const videoElement = document.getElementById('video');
+        if (videoElement && videoElement.srcObject) {
+            currentStream = videoElement.srcObject;
+            const track = currentStream.getVideoTracks()[0];
+            const capabilities = track.getCapabilities();
+            
+            // Check if device supports Focus Mode and apply it
+            if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
+                await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+            } else if (capabilities.focusMode && capabilities.focusMode.includes('macro')) {
+                 await track.applyConstraints({ advanced: [{ focusMode: 'macro' }] });
+            }
+        }
+
+    } catch (err) {
+        console.error(err);
+        container.innerHTML = `<div class="text-red-400 p-4 text-center">Camera Error: ${err.message}<br>Check permissions.</div>`;
     }
 };
+
+function handleScanSuccess(text, controls) {
+    // 1. Stop Scanner Immediately
+    if(controls) controls.stop();
+    stopScanner();
+
+    // 2. Play Beep (Feedback)
+    const audio = new Audio('https://www.soundjay.com/buttons/beep-01a.mp3');
+    audio.volume = 0.5;
+    audio.play().catch(e => {}); // Ignore auto-play errors
+
+    // 3. Perform Search
+    document.getElementById('searchInput').value = text;
+    performSearch(text);
+
+    // 4. API Call
+    fetch('/api/search', {
+         method: 'POST',
+         headers: {'Content-Type': 'application/json'},
+         body: JSON.stringify({ query: text, mode: 'barcode' })
+    }).then(r => r.json()).then(data => {
+        if(data.length > 0) {
+            prepFoodForEdit(data[0], true);
+        } else {
+            alert("Product not found via Barcode.");
+        }
+    });
+}
+
+window.stopScanner = function() {
+    // Stop the ZXing controls
+    if (window.activeScannerControls) {
+        window.activeScannerControls.stop();
+        window.activeScannerControls = null;
+    }
+    
+    // Hard stop all video tracks (turns off camera light)
+    if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+        currentStream = null;
+    }
+    
+    // Clear DOM
+    const container = document.getElementById('scanner-container');
+    if (container) {
+        container.innerHTML = '';
+        container.classList.add('hidden');
+    }
+};
+
 
 // --- VISION ---
 window.triggerVision = function(type) {
