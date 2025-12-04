@@ -25,7 +25,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// --- HELPER: Extract Micros from OpenFoodFacts ---
+// --- HELPER: Extract Micros ---
 function extractMicros(n) {
     if (!n) return {};
     return {
@@ -60,27 +60,33 @@ function extractMicros(n) {
 app.post('/api/search', async (req, res) => {
     const { query, mode } = req.body;
 
-    // 1. OPEN FOOD FACTS
+    // 1. OPEN FOOD FACTS (Optimized for Germany/Speed)
     try {
         let url;
+        // We limit fields to reduce data transfer size significantly
+        const fields = 'product_name,product_name_de,brands,nutriments,code,_id';
+        
         if (mode === 'barcode') {
-            url = `https://world.openfoodfacts.org/api/v2/product/${query}.json`;
+            url = `https://world.openfoodfacts.org/api/v2/product/${query}.json?fields=${fields}`;
         } else {
-            url = `https://de.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=5`;
+            // Using search.pl with specific fields is faster than the generic full search
+            // We prioritize German results explicitly via URL but allow world fallback
+            url = `https://de.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=10&fields=${fields}`;
         }
 
-        const response = await axios.get(url, { timeout: 4000 });
+        // Increased timeout to 8000ms to allow OFF to respond before failing to AI
+        const response = await axios.get(url, { timeout: 8000 });
         let products = [];
 
-        if (mode === 'barcode' && response.data.status === 1) {
+        if (mode === 'barcode' && (response.data.status === 1 || response.data.product)) {
             products = [response.data.product];
-        } else if (response.data.products) {
+        } else if (response.data.products && response.data.products.length > 0) {
             products = response.data.products;
         }
 
         if (products.length > 0) {
             const results = products.map(p => ({
-                name: p.product_name || p.product_name_de || "Unknown Product",
+                name: p.product_name_de || p.product_name || "Unknown Product",
                 brand: p.brands || "",
                 calories: p.nutriments?.['energy-kcal'] || 0,
                 protein: p.nutriments?.proteins || 0,
@@ -94,21 +100,22 @@ app.post('/api/search', async (req, res) => {
             return res.json(results);
         }
     } catch (e) {
-        console.log("OFF Error, trying fallback...");
+        console.log(`OFF Error (${e.message}), falling back to AI...`);
     }
 
+    // If Barcode failed in database, don't use AI (AI can't read barcode digits contextually)
     if (mode === 'barcode') {
         return res.status(404).json({ error: 'Barcode not found' });
     }
 
-    // 3. AI FALLBACK
+    // 2. AI FALLBACK (Only if Database fails/returns empty)
     try {
         console.log(`Using AI fallback for: ${query}`);
         const completion = await openai.chat.completions.create({
             model: "gpt-4o-mini",
             messages: [{
                 role: "user",
-                content: `User searched for "${query}". It was not found in the database. 
+                content: `User searched for "${query}". It was not found in the German food database. 
                 Return a JSON object for 1 standard serving (or 100g if generic).
                 Include name, calories, protein, carbs, fat.
                 Also estimate these micros if applicable (mg/ug): vitamin_a, thiamin, riboflavin, vitamin_b6, vitamin_b12, biotin, folic_acid, niacin, pantothenic_acid, vitamin_c, vitamin_d, vitamin_e, vitamin_k, calcium, magnesium, zinc, chromium, molybdenum, iodine, selenium, phosphorus, manganese, iron, copper.
