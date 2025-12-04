@@ -797,7 +797,7 @@ window.changeDate = (offset) => {
 };
 
 window.exportJSON = () => {
-    // 1. Filter for recent logs (last 7 days + today) to allow duplicate checking
+    // 1. Filter for recent logs (last 7 days + today)
     const today = new Date();
     const pastDate = new Date();
     pastDate.setDate(today.getDate() - 7); 
@@ -811,11 +811,11 @@ window.exportJSON = () => {
     const exportData = recentLogs.map((l, index) => {
         const factor = (l.unit === 'g' || l.unit === 'ml') ? (l.qty / 100) : l.qty;
         
-        // Ensure time is unique (add index to seconds if needed)
-        // If timestamp exists, use it. If not, generate a fake one.
+        // Ensure strictly unique timestamp for deduplication
+        // If the log has a saved timestamp, use it.
+        // If not, generate one based on the date + index to ensure uniqueness.
         let uniqueTime = l.timestamp || `${l.date}T12:00:${String(index % 60).padStart(2, '0')}.000Z`;
-        
-        // Build a clean object with numbers already rounded
+
         const item = {
             date: uniqueTime,
             name: l.name,
@@ -824,11 +824,10 @@ window.exportJSON = () => {
             carbs: Math.round(l.carbs * 10) / 10,
             fat: Math.round(l.fat * 10) / 10
         };
-
-        // Add micros only if they exist (prevents sending nulls)
+        
+        // Add micros only if they exist
         MICRO_KEYS.forEach(key => {
             if (l.micros && l.micros[key]) {
-                // Use the exact key names from your app (e.g., "vitamin_c")
                 item[key] = Math.round((l.micros[key] * factor) * 100) / 100;
             }
         });
@@ -840,7 +839,7 @@ window.exportJSON = () => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData));
     const link = document.createElement("a");
     link.setAttribute("href", dataStr);
-    link.setAttribute("download", `foodlog_export_${state.currentDate}.json`);
+    link.setAttribute("download", `foodlog_sync.json`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
