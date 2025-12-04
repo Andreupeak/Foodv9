@@ -56,62 +56,84 @@ function extractMicros(n) {
     };
 }
 
+
 // --- API: Search ---
 app.post('/api/search', async (req, res) => {
     const { query, mode } = req.body;
 
-    // 1. OPEN FOOD FACTS
+    // --- STRATEGY: Barcode = Global | Text = Waterfall (DE -> World -> AI) ---
+
+    // 1. HANDLE BARCODE (Always Global)
+    if (mode === 'barcode') {
+        try {
+            // Barcodes are globally unique, so we always search the World DB.
+            // This works for German Nutella AND Indian Haldiram's.
+            const url = `https://world.openfoodfacts.org/api/v2/product/${query}.json`;
+            const response = await axios.get(url, { timeout: 8000 });
+            
+            if (response.data.status === 1) {
+                const p = response.data.product;
+                return res.json([{
+                    name: p.product_name || p.product_name_de || "Unknown Product",
+                    brand: p.brands || "",
+                    calories: p.nutriments?.['energy-kcal'] || 0,
+                    protein: p.nutriments?.proteins || 0,
+                    carbs: p.nutriments?.carbohydrates || 0,
+                    fat: p.nutriments?.fat || 0,
+                    micros: extractMicros(p.nutriments),
+                    unit: 'g', 
+                    base_qty: 100,
+                    source: 'OpenFoodFacts (Scan)'
+                }]);
+            }
+            return res.status(404).json({ error: 'Barcode not found' });
+        } catch (e) {
+            return res.status(500).json({ error: 'Scan failed' });
+        }
+    }
+
+    // 2. HANDLE TEXT SEARCH (The Waterfall)
+    
+    // Step A: Search German Database
+    // This ensures "Nutella" gives you the German version
     try {
-        let url;
-        if (mode === 'barcode') {
-            url = `https://world.openfoodfacts.org/api/v2/product/${query}.json`;
-        } else {
-            url = `https://de.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=5`;
+        const urlDE = `https://de.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=5`;
+        const resDE = await axios.get(urlDE, { timeout: 5000 });
+        
+        if (resDE.data.products && resDE.data.products.length > 0) {
+            const results = mapProducts(resDE.data.products, 'OpenFoodFacts (DE)');
+            return res.json(results);
         }
+        console.log(`German DB empty for "${query}", checking World DB...`);
+    } catch (e) {
+        console.log("German DB timed out, trying World...");
+    }
 
-        const response = await axios.get(url, { timeout: 4000 });
-        let products = [];
+    // Step B: Search World Database (Fallback for Indian/Imported items)
+    // This catches "Haldiram's" or spices that aren't tagged as "German" yet
+    try {
+        const urlWorld = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=5`;
+        const resWorld = await axios.get(urlWorld, { timeout: 5000 });
 
-        if (mode === 'barcode' && response.data.status === 1) {
-            products = [response.data.product];
-        } else if (response.data.products) {
-            products = response.data.products;
-        }
-
-        if (products.length > 0) {
-            const results = products.map(p => ({
-                name: p.product_name || p.product_name_de || "Unknown Product",
-                brand: p.brands || "",
-                calories: p.nutriments?.['energy-kcal'] || 0,
-                protein: p.nutriments?.proteins || 0,
-                carbs: p.nutriments?.carbohydrates || 0,
-                fat: p.nutriments?.fat || 0,
-                micros: extractMicros(p.nutriments),
-                unit: 'g', 
-                base_qty: 100,
-                source: 'OpenFoodFacts'
-            }));
+        if (resWorld.data.products && resWorld.data.products.length > 0) {
+            const results = mapProducts(resWorld.data.products, 'OpenFoodFacts (World)');
             return res.json(results);
         }
     } catch (e) {
-        console.log("OFF Error, trying fallback...");
+        console.log("World DB Error");
     }
 
-    if (mode === 'barcode') {
-        return res.status(404).json({ error: 'Barcode not found' });
-    }
-
-    // 3. AI FALLBACK
+    // Step C: AI Fallback
+    // If we are here, it's truly unknown (neither in Germany nor globally)
     try {
         console.log(`Using AI fallback for: ${query}`);
         const completion = await openai.chat.completions.create({
             model: "gpt-4o-mini",
             messages: [{
                 role: "user",
-                content: `User searched for "${query}". It was not found in the database. 
+                content: `User searched for "${query}" in Germany (possibly Indian import). Not found in databases. 
                 Return a JSON object for 1 standard serving (or 100g if generic).
-                Include name, calories, protein, carbs, fat.
-                Also estimate these micros if applicable (mg/ug): vitamin_a, thiamin, riboflavin, vitamin_b6, vitamin_b12, biotin, folic_acid, niacin, pantothenic_acid, vitamin_c, vitamin_d, vitamin_e, vitamin_k, calcium, magnesium, zinc, chromium, molybdenum, iodine, selenium, phosphorus, manganese, iron, copper.
+                If it's a known Indian product (e.g. specific Dal, Snack), estimate closely.
                 Response format: { "name":Str, "base_qty":Num, "unit":Str, "calories":Num, "protein":Num, "carbs":Num, "fat":Num, "micros":{...} }
                 Strict JSON only.`
             }]
@@ -126,6 +148,23 @@ app.post('/api/search', async (req, res) => {
         return res.status(500).json({ error: 'Search failed' });
     }
 });
+
+// Helper for mapping OFF products to your app format
+function mapProducts(products, sourceLabel) {
+    return products.map(p => ({
+        name: p.product_name || p.product_name_de || p.product_name_en || "Unknown Product",
+        brand: p.brands || "",
+        calories: p.nutriments?.['energy-kcal'] || 0,
+        protein: p.nutriments?.proteins || 0,
+        carbs: p.nutriments?.carbohydrates || 0,
+        fat: p.nutriments?.fat || 0,
+        micros: extractMicros(p.nutriments),
+        unit: 'g', 
+        base_qty: 100,
+        source: sourceLabel
+    }));
+}
+
 
 // --- API: Analyze Ingredients (Itemized) ---
 app.post('/api/analyze', async (req, res) => {
