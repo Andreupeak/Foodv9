@@ -186,6 +186,11 @@ window.openAddModal = function(meal) {
 };
 
 window.setSearchMode = function(mode) {
+    // Stop scanner if leaving search tab
+    if (state.activeTab === 'search' && mode !== 'search') {
+        stopScanner();
+    }
+
     state.activeTab = mode;
     const views = ['search', 'analyze', 'create', 'favs'];
     views.forEach(v => {
@@ -215,7 +220,7 @@ document.getElementById('searchInput').addEventListener('input', (e) => {
 async function performSearch(query) {
     if(query.length < 2) return;
     const resDiv = document.getElementById('searchResults');
-    resDiv.innerHTML = '<div class="text-center mt-4"><i class="fa-solid fa-spinner fa-spin text-emerald-500"></i> searching...</div>';
+    resDiv.innerHTML = '<div class="text-center mt-4"><i class="fa-solid fa-spinner fa-spin text-emerald-500"></i> searching database...</div>';
     
     try {
         const res = await fetch('/api/search', {
@@ -355,6 +360,9 @@ window.editExistingLog = function(id) {
 };
 
 function prepFoodForEdit(item, isNew) {
+    // Stop scanner if user selects a food
+    stopScanner();
+
     const factor = item.base_qty ? (item.base_qty === 100 && (item.unit === 'g'|| item.unit==='ml') ? 1 : item.base_qty) : 1;
 
     state.tempFood = {
@@ -414,18 +422,32 @@ window.saveLog = function() {
     
     state.selectedMeal = meal;
 
-    // GENERATE UNIQUE TIMESTAMP
-    // We add a random number (0-999) to the milliseconds to ensure no two logs 
-    // have the exact same time, even if created in the same second.
+    // --- TIMESTAMP FIX ---
+    // If state.currentDate is NOT today (user is logging for yesterday), we must construct
+    // a timestamp that reflects that date, otherwise Apple Health/Export sees it as today.
+    let logTimestamp;
     const now = new Date();
-    now.setMilliseconds(now.getMilliseconds() + Math.floor(Math.random() * 999));
-    const uniqueTimestamp = now.toISOString();
+    
+    // Check if currentDate matches today's date string
+    const todayStr = now.toISOString().split('T')[0];
+    
+    if (state.currentDate !== todayStr) {
+        // Construct timestamp: Selected Date + Current Time (to preserve order)
+        // Format: YYYY-MM-DDTHH:mm:ss.sssZ
+        const timePart = now.toISOString().split('T')[1];
+        logTimestamp = `${state.currentDate}T${timePart}`;
+    } else {
+        // Just use standard "now" if logging for today
+        // Add random ms to prevent collision
+        now.setMilliseconds(now.getMilliseconds() + Math.floor(Math.random() * 999));
+        logTimestamp = now.toISOString();
+    }
 
     const log = {
         id: state.tempFood.isNew ? Math.random().toString(36).substr(2, 9) : state.tempFood.id,
         date: state.currentDate,
-        // Use existing timestamp if editing, otherwise use new unique one
-        timestamp: (state.tempFood.isNew || !state.tempFood.timestamp) ? uniqueTimestamp : state.tempFood.timestamp,
+        // Use existing timestamp if editing, otherwise use calculated one
+        timestamp: (state.tempFood.isNew || !state.tempFood.timestamp) ? logTimestamp : state.tempFood.timestamp,
         meal: meal,
         name: state.tempFood.name,
         qty, unit,
@@ -585,21 +607,39 @@ window.generateMealPlan = async function() {
     document.getElementById('plannerInput').disabled = false;
 };
 
-// --- SCANNER FIX ---
+// --- SCANNER LOGIC (IMPROVED) ---
 let html5QrcodeScanner;
+
 window.startScanner = function() {
-    document.getElementById('scanner-container').classList.remove('hidden');
-    if(html5QrcodeScanner) { 
-        html5QrcodeScanner.clear();
-        html5QrcodeScanner = null;
-    }
-    html5QrcodeScanner = new Html5Qrcode("scanner-container");
-    const config = { fps: 15, qrbox: { width: 250, height: 150 }, aspectRatio: 1.0 };
+    const container = document.getElementById('scanner-container');
+    container.classList.remove('hidden');
     
-    html5QrcodeScanner.start({ facingMode: "environment" }, config, (decodedText) => {
-        html5QrcodeScanner.stop().then(() => {
-            document.getElementById('scanner-container').classList.add('hidden');
-            performSearch(decodedText);
+    // If scanner instance exists, just return (already running)
+    if(html5QrcodeScanner) return;
+    
+    // Improved Config: Use native barcode detector if available (much faster)
+    html5QrcodeScanner = new Html5Qrcode("scanner-container");
+    const config = { 
+        fps: 10, 
+        qrbox: { width: 250, height: 150 }, 
+        aspectRatio: 1.0,
+        experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true
+        }
+    };
+    
+    html5QrcodeScanner.start(
+        { facingMode: "environment" }, 
+        config, 
+        (decodedText) => {
+            // SUCCESS
+            stopScanner(); // Stop immediately on success
+            
+            // Show loading in search
+            document.getElementById('searchInput').value = decodedText;
+            performSearch(decodedText); 
+            
+            // Specifically trigger barcode search mode on backend
             fetch('/api/search', {
                  method: 'POST',
                  headers: {'Content-Type': 'application/json'},
@@ -611,8 +651,26 @@ window.startScanner = function() {
                     alert("Product not found. Try searching by name.");
                 }
             });
+        }, 
+        (err) => {
+            // Ignore scan failures (happens every frame)
+        }
+    ).catch(err => {
+        container.innerHTML = '<div class="text-red-400 p-4">Camera Error</div>';
+    });
+};
+
+window.stopScanner = function() {
+    if (html5QrcodeScanner) {
+        html5QrcodeScanner.stop().then(() => {
+            html5QrcodeScanner.clear();
+            html5QrcodeScanner = null;
+            document.getElementById('scanner-container').classList.add('hidden');
+        }).catch(err => {
+            console.log("Failed to stop scanner", err);
+            html5QrcodeScanner = null; // Force null
         });
-    }, (err) => {});
+    }
 };
 
 // --- VISION ---
@@ -656,8 +714,17 @@ window.handleVision = async function(input) {
 // --- UTILS ---
 window.openProfile = () => document.getElementById('profileModal').classList.remove('translate-y-full');
 window.closeProfile = () => document.getElementById('profileModal').classList.add('translate-y-full');
-window.closeAddModal = () => document.getElementById('addModal').classList.add('translate-y-full');
-window.closeEditModal = () => document.getElementById('editModal').classList.add('hidden');
+
+window.closeAddModal = () => {
+    stopScanner(); // Ensure camera turns off
+    document.getElementById('addModal').classList.add('translate-y-full');
+};
+
+window.closeEditModal = () => {
+    stopScanner(); // Just in case
+    document.getElementById('editModal').classList.add('hidden');
+};
+
 window.openPlanner = () => document.getElementById('plannerModal').classList.remove('translate-y-full');
 window.closePlanner = () => document.getElementById('plannerModal').classList.add('translate-y-full');
 
