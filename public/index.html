@@ -121,7 +121,6 @@
                 </button>
             </div>
             
-            <!-- Manual Barcode Button -->
             <button onclick="manualBarcode()" class="w-full py-3 bg-slate-900 rounded-xl border border-slate-800 text-slate-400 text-sm font-medium flex items-center justify-center gap-2 hover:text-white hover:border-slate-600 transition mb-4">
                 <i class="fa-solid fa-keyboard"></i> Enter Barcode Manually
             </button>
@@ -155,9 +154,7 @@
                      <div><label class="text-xs text-slate-500">F</label><input id="manFat" class="input-dark" type="number" placeholder="0"></div>
                 </div>
                 
-                <!-- Expanded Manual Entry -->
                 <div class="border-t border-slate-800 pt-3 mt-3">
-                    
                     <p class="text-sm font-bold text-slate-300 mb-2">Macro Details</p>
                     <div class="grid grid-cols-2 gap-3">
                          <div><label class="text-[10px] text-slate-500">Sugars (g)</label><input id="man_sugars" class="input-dark" type="number"></div>
@@ -218,8 +215,9 @@
         </div>
     </div>
 
-    <div id="editModal" class="fixed inset-0 bg-black/80 z-[60] hidden flex items-end justify-center backdrop-blur-sm">
-        <div class="bg-slate-900 w-full rounded-t-3xl p-6 border-t border-slate-700 shadow-2xl">
+    <!-- UPDATED EDIT MODAL WITH FULL EDITING CAPABILITIES -->
+    <div id="editModal" class="fixed inset-0 bg-black/80 z-[60] hidden flex items-end justify-center backdrop-blur-sm overflow-y-auto">
+        <div class="bg-slate-900 w-full rounded-t-3xl p-6 border-t border-slate-700 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-start mb-4">
                 <div>
                     <h2 id="editName" class="text-xl font-bold text-white">Food Name</h2>
@@ -259,25 +257,82 @@
             <div class="grid grid-cols-4 gap-2 mb-6">
                 <div class="bg-slate-800 rounded-lg p-2 text-center">
                     <div class="text-[10px] text-slate-500">Kcal</div>
-                    <div id="editKcal" class="font-bold text-white">0</div>
+                    <input id="editKcal" type="number" class="w-full bg-transparent text-white font-bold text-center outline-none">
                 </div>
                 <div class="bg-slate-800 rounded-lg p-2 text-center">
                     <div class="text-[10px] text-slate-500">Carbs</div>
-                    <div id="editCarbs" class="font-bold text-blue-400">0</div>
+                    <input id="editCarbs" type="number" class="w-full bg-transparent text-blue-400 font-bold text-center outline-none">
                 </div>
                 <div class="bg-slate-800 rounded-lg p-2 text-center">
                     <div class="text-[10px] text-slate-500">Prot</div>
-                    <div id="editProt" class="font-bold text-red-400">0</div>
+                    <input id="editProt" type="number" class="w-full bg-transparent text-red-400 font-bold text-center outline-none">
                 </div>
                 <div class="bg-slate-800 rounded-lg p-2 text-center">
                     <div class="text-[10px] text-slate-500">Fat</div>
-                    <div id="editFat" class="font-bold text-yellow-400">0</div>
+                    <input id="editFat" type="number" class="w-full bg-transparent text-yellow-400 font-bold text-center outline-none">
                 </div>
+            </div>
+
+            <button onclick="document.getElementById('editMicrosArea').classList.toggle('hidden')" class="w-full py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-400 text-xs font-bold uppercase tracking-wide mb-4 hover:text-white transition">
+                Show/Edit Details & Micros
+            </button>
+
+            <!-- COLLAPSIBLE EDIT AREA -->
+            <div id="editMicrosArea" class="hidden border-t border-slate-800 pt-3 mb-4">
+                 <p class="text-sm font-bold text-slate-300 mb-2">Macro Details</p>
+                    <div class="grid grid-cols-2 gap-3">
+                         <div><label class="text-[10px] text-slate-500">Sugars (g)</label><input id="edit_sugars" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Fiber (g)</label><input id="edit_fiber" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Sat. Fat (g)</label><input id="edit_saturated_fat" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Mono. Fat (g)</label><input id="edit_monounsaturated_fat" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Poly. Fat (g)</label><input id="edit_polyunsaturated_fat" class="input-dark" type="number"></div>
+                    </div>
+
+                    <p class="text-sm font-bold text-slate-300 mb-2 mt-4">Vitamins</p>
+                    <div class="grid grid-cols-2 gap-3">
+                         <div><label class="text-[10px] text-slate-500">Vit A (µg)</label><input id="edit_vitamin_a" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Vit C (mg)</label><input id="edit_vitamin_c" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Vit D3 (µg)</label><input id="edit_vitamin_d" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Vit E (mg)</label><input id="edit_vitamin_e" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Vit K1 (µg)</label><input id="edit_vitamin_k" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">B1 Thiamin (mg)</label><input id="edit_thiamin" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">B2 Riboflavin (mg)</label><input id="edit_riboflavin" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">B3 Niacin (mg)</label><input id="edit_niacin" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">B5 Pantothenic (mg)</label><input id="edit_pantothenic_acid" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">B6 Pyridoxine (mg)</label><input id="edit_vitamin_b6" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">B7 Biotin (µg)</label><input id="edit_biotin" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">B9 Folic Acid (µg)</label><input id="edit_folic_acid" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">B12 Cobalamin (µg)</label><input id="edit_vitamin_b12" class="input-dark" type="number"></div>
+                    </div>
+
+                    <p class="text-sm font-bold text-slate-300 mb-2 mt-4">Minerals & Electrolytes</p>
+                    <div class="grid grid-cols-2 gap-3">
+                         <div><label class="text-[10px] text-slate-500">Sodium (mg)</label><input id="edit_sodium" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Potassium (mg)</label><input id="edit_potassium" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Calcium (mg)</label><input id="edit_calcium" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Magnesium (mg)</label><input id="edit_magnesium" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Zinc (mg)</label><input id="edit_zinc" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Iron (mg)</label><input id="edit_iron" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Phosphorus (mg)</label><input id="edit_phosphorus" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Chloride (mg)</label><input id="edit_chloride" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Iodine (µg)</label><input id="edit_iodine" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Selenium (µg)</label><input id="edit_selenium" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Copper (mg)</label><input id="edit_copper" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Manganese (mg)</label><input id="edit_manganese" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Chromium (µg)</label><input id="edit_chromium" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Molybdenum (µg)</label><input id="edit_molybdenum" class="input-dark" type="number"></div>
+                    </div>
+
+                    <p class="text-sm font-bold text-slate-300 mb-2 mt-4">Other</p>
+                    <div class="grid grid-cols-2 gap-3">
+                         <div><label class="text-[10px] text-slate-500">Caffeine (mg)</label><input id="edit_caffeine" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Water (g)</label><input id="edit_water" class="input-dark" type="number"></div>
+                    </div>
             </div>
             
             <div class="flex gap-3">
                 <button id="addToFavBtn" class="p-4 bg-slate-800 text-slate-400 rounded-xl"><i class="fa-regular fa-heart"></i></button>
-                <button onclick="saveLog()" class="flex-1 bg-emerald-600 text-white rounded-xl font-bold text-lg shadow-lg shadow-emerald-900/50">Add to Diary</button>
+                <button onclick="saveLog()" class="flex-1 bg-emerald-600 text-white rounded-xl font-bold text-lg shadow-lg shadow-emerald-900/50">Save Changes</button>
             </div>
         </div>
     </div>
