@@ -1,297 +1,739 @@
-// --- CONFIG & LISTS ---
-const MEALS = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
-
-[cite_start]// Categorized Nutrient Keys for Loops [cite: 1]
-const NUTRIENT_GROUPS = {
-    details: ['sugar', 'fiber', 'saturated_fat', 'monounsaturated_fat', 'polyunsaturated_fat', 'sodium', 'potassium', 'chloride', 'caffeine', 'water'],
-    vitamins: ['vitamin_a', 'thiamin', 'riboflavin', 'vitamin_b6', 'vitamin_b12', 'biotin', 'folic_acid', 'niacin', 'pantothenic_acid', 'vitamin_c', 'vitamin_d', 'vitamin_e', 'vitamin_k'],
-    minerals: ['calcium', 'magnesium', 'zinc', 'chromium', 'molybdenum', 'iodine', 'selenium', 'phosphorus', 'manganese', 'iron', 'copper']
-};
-
-// Flattened list for calculations
-const ALL_NUTRIENTS = [...NUTRIENT_GROUPS.details, ...NUTRIENT_GROUPS.vitamins, ...NUTRIENT_GROUPS.minerals];
-
+// --- STATE ---
 const state = {
     logs: JSON.parse(localStorage.getItem('foodlog_logs')) || [],
-    user: JSON.parse(localStorage.getItem('foodlog_user')) || { kcal: 2000, p: 150, c: 250, f: 70 },
+    user: JSON.parse(localStorage.getItem('foodlog_user')) || { 
+        weight: 70, height: 175, age: 30, gender: 'male', activity: 1.375, goal: 0,
+        kcal: 2000, p: 150, c: 250, f: 70 
+    },
     favorites: JSON.parse(localStorage.getItem('foodlog_favs')) || [],
     currentDate: new Date().toISOString().split('T')[0],
     selectedMeal: 'Breakfast',
     tempFood: null,
-    activeTab: 'search',
-    mainView: 'diary' // diary vs coach
+    activeTab: 'search' 
 };
+
+const MEALS = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
+
+const MICRO_KEYS = [
+    // Macro Details
+    'sugars', 'fiber', 'saturated_fat', 'monounsaturated_fat', 'polyunsaturated_fat',
+    // Minerals / Electrolytes
+    'sodium', 'potassium', 'chloride', 'calcium', 'magnesium', 'zinc', 
+    'chromium', 'molybdenum', 'iodine', 'selenium', 'phosphorus', 'manganese', 'iron', 'copper',
+    // Vitamins
+    'vitamin_a', 'thiamin', 'riboflavin', 'vitamin_b6', 'vitamin_b12',
+    'biotin', 'folic_acid', 'niacin', 'pantothenic_acid', 'vitamin_c',
+    'vitamin_d', 'vitamin_e', 'vitamin_k', 
+    // Other
+    'caffeine', 'water'
+];
 
 // --- INIT ---
 function init() {
     renderDate();
     renderMeals();
     renderDashboard();
-    // Pre-build Edit Modal Inputs
-    buildEditModalInputs();
+    renderProfileValues();
 }
 
-// --- NAVIGATION ---
-window.switchMainView = function(view) {
-    state.mainView = view;
-    if(view === 'diary') {
-        document.getElementById('main-view').classList.remove('hidden');
-        document.getElementById('view-coach').classList.add('hidden');
-    } else {
-        document.getElementById('main-view').classList.add('hidden');
-        document.getElementById('view-coach').classList.remove('hidden');
-        document.getElementById('view-coach').classList.add('flex');
-    }
-    // Update Nav Icons opacity/color
-    document.querySelectorAll('.nav-item').forEach(btn => {
-        if(btn.innerText.toLowerCase().includes(view)) btn.classList.add('text-emerald-400');
-        else btn.classList.remove('text-emerald-400');
+// --- RENDERERS ---
+function renderDate() {
+    const d = new Date(state.currentDate);
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('currentDateDisplay').innerText = state.currentDate === today ? 'Today' : d.toDateString();
+}
+
+function renderMeals() {
+    const container = document.getElementById('mealsContainer');
+    container.innerHTML = '';
+    const dayLogs = state.logs.filter(l => l.date === state.currentDate);
+
+    MEALS.forEach(meal => {
+        const mealLogs = dayLogs.filter(l => l.meal === meal);
+        const mealCals = mealLogs.reduce((acc, curr) => acc + (curr.calories || 0), 0);
+
+        let html = `
+            <div class="bg-slate-900 rounded-2xl border border-slate-800 p-4">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-bold text-slate-200">${meal}</h3>
+                    <span class="text-xs text-slate-500 font-mono">${Math.round(mealCals)} kcal</span>
+                </div>
+                <div class="space-y-3">
+        `;
+
+        if(mealLogs.length === 0) {
+            html += `<div class="text-xs text-slate-600 italic py-2">No food logged</div>`;
+        } else {
+            mealLogs.forEach(log => {
+                html += `
+                    <div onclick="editExistingLog('${log.id}')" class="flex justify-between items-center border-b border-slate-800 pb-2 last:border-0 cursor-pointer active:opacity-70">
+                        <div>
+                            <div class="font-medium text-slate-200 text-sm">${log.name}</div>
+                            <div class="text-xs text-slate-500">${log.qty}${log.unit}</div>
+                        </div>
+                        <div class="text-xs text-emerald-500 font-medium">${Math.round(log.calories)}</div>
+                    </div>
+                `;
+            });
+        }
+
+        html += `
+                </div>
+                <button onclick="openAddModal('${meal}')" class="mt-3 w-full py-2.5 text-xs font-bold uppercase tracking-wider text-emerald-400 bg-emerald-950/30 border border-emerald-900/50 rounded-xl hover:bg-emerald-900/50 transition">
+                    + Add Food
+                </button>
+            </div>
+        `;
+        container.innerHTML += html;
     });
-};
+}
 
-// --- MANUAL BARCODE ---
-window.toggleManualBarcode = function() {
-    const el = document.getElementById('manualBarcodeInput');
-    el.classList.toggle('hidden');
-    if(!el.classList.contains('hidden')) document.getElementById('pasteBarcode').focus();
-};
+function renderDashboard() {
+    const dayLogs = state.logs.filter(l => l.date === state.currentDate);
+    const totals = dayLogs.reduce((acc, curr) => ({
+        kcal: acc.kcal + (curr.calories || 0),
+        p: acc.p + (curr.protein || 0),
+        c: acc.c + (curr.carbs || 0),
+        f: acc.f + (curr.fat || 0)
+    }), { kcal: 0, p: 0, c: 0, f: 0 });
 
-window.searchManualBarcode = function() {
-    const code = document.getElementById('pasteBarcode').value;
-    if(code) {
-        document.getElementById('searchInput').value = code;
-        fetch('/api/search', {
-             method: 'POST',
-             headers: {'Content-Type': 'application/json'},
-             body: JSON.stringify({ query: code, mode: 'barcode' })
-        }).then(r => r.json()).then(data => {
-            if(data.length > 0) prepFoodForEdit(data[0], true);
-            else alert("Not found");
-        });
-    }
-};
+    const remaining = Math.round(state.user.kcal - totals.kcal);
+    const percent = Math.min((totals.kcal / state.user.kcal) * 100, 100);
+    
+    document.getElementById('calRemaining').innerText = remaining;
+    document.getElementById('calCircle').style.setProperty('--percent', `${percent}%`);
+    document.getElementById('calCircle').style.setProperty('--color', remaining < 0 ? '#ef4444' : '#34d399');
 
-[cite_start]// --- AI COACH [cite: 6] ---
-window.askCoach = async function() {
-    const input = document.getElementById('coachInput');
-    const query = input.value;
-    if(!query) return;
+    updateBar('carb', totals.c, state.user.c);
+    updateBar('prot', totals.p, state.user.p);
+    updateBar('fat', totals.f, state.user.f);
+}
 
-    // Add user message to UI
-    const chat = document.getElementById('coachChat');
-    chat.innerHTML += `<div class="bg-emerald-900/30 p-3 rounded-xl rounded-tr-none border border-emerald-900 ml-auto max-w-[80%] text-sm text-white">${query}</div>`;
-    input.value = '';
-    chat.scrollTop = chat.scrollHeight;
+function updateBar(type, val, max) {
+    const pct = Math.min((val / max) * 100, 100);
+    document.getElementById(`${type}Val`).innerText = `${Math.round(val)}/${Math.round(max)}g`;
+    document.getElementById(`${type}Bar`).style.width = `${pct}%`;
+}
 
-    // Get last 7 days history
-    const history = state.logs.filter(l => {
-        const d = new Date(l.date);
-        const now = new Date();
-        return (now - d) / (1000 * 60 * 60 * 24) < 7;
+// --- GOAL CALCULATOR & PROFILE ---
+function renderProfileValues() {
+    ['Weight', 'Height', 'Age', 'Gender', 'Activity', 'Goal'].forEach(k => {
+        const key = k.toLowerCase();
+        const el = document.getElementById(`p${k}`);
+        if(el && state.user[key]) el.value = state.user[key];
     });
 
+    if(state.user.manualKcal) document.getElementById('manualKcal').value = state.user.manualKcal;
+    if(state.user.manualProt) document.getElementById('manualProt').value = state.user.manualProt;
+    if(state.user.manualCarb) document.getElementById('manualCarb').value = state.user.manualCarb;
+    if(state.user.manualFat) document.getElementById('manualFat').value = state.user.manualFat;
+}
+
+window.calculateGoals = function() {
+    const w = parseFloat(document.getElementById('pWeight').value);
+    const h = parseFloat(document.getElementById('pHeight').value);
+    const a = parseFloat(document.getElementById('pAge').value);
+    const g = document.getElementById('pGender').value;
+    const act = parseFloat(document.getElementById('pActivity').value);
+    const goalOffset = parseFloat(document.getElementById('pGoal').value);
+
+    let bmr = (10 * w) + (6.25 * h) - (5 * a);
+    bmr += (g === 'male' ? 5 : -161);
+
+    const tdee = bmr * act;
+    const targetKcal = tdee + goalOffset;
+
+    const p = (targetKcal * 0.30) / 4;
+    const c = (targetKcal * 0.35) / 4;
+    const f = (targetKcal * 0.35) / 9;
+
+    state.user = { 
+        weight: w, height: h, age: a, gender: g, activity: act, goal: goalOffset, 
+        kcal: targetKcal, p, c, f,
+        manualKcal: null, manualProt: null, manualCarb: null, manualFat: null
+    };
+    
+    saveUserAndRefresh();
+    alert("Goals automatically calculated!");
+};
+
+window.saveManualGoals = function() {
+    const mKcal = parseFloat(document.getElementById('manualKcal').value);
+    const mProt = parseFloat(document.getElementById('manualProt').value);
+    const mCarb = parseFloat(document.getElementById('manualCarb').value);
+    const mFat = parseFloat(document.getElementById('manualFat').value);
+
+    if(mKcal) state.user.kcal = mKcal;
+    if(mProt) state.user.p = mProt;
+    if(mCarb) state.user.c = mCarb;
+    if(mFat) state.user.f = mFat;
+
+    state.user.manualKcal = mKcal;
+    state.user.manualProt = mProt;
+    state.user.manualCarb = mCarb;
+    state.user.manualFat = mFat;
+
+    saveUserAndRefresh();
+    alert("Manual goals saved!");
+};
+
+function saveUserAndRefresh() {
+    localStorage.setItem('foodlog_user', JSON.stringify(state.user));
+    renderProfileValues();
+    renderDashboard();
+    closeProfile();
+}
+
+// --- ADD / SEARCH / ANALYZE / CREATE / FAVORITES ---
+window.openAddModal = function(meal) {
+    if(meal) state.selectedMeal = meal;
+    document.getElementById('addModal').classList.remove('translate-y-full');
+    setSearchMode('search');
+};
+
+window.setSearchMode = function(mode) {
+    // Stop scanner if leaving search tab
+    if (state.activeTab === 'search' && mode !== 'search') {
+        stopScanner();
+    }
+
+    state.activeTab = mode;
+    const views = ['search', 'analyze', 'create', 'favs'];
+    views.forEach(v => {
+        const el = document.getElementById(`view-${v}`);
+        const tab = document.getElementById(`tab-${v}`);
+        if(v === mode) {
+            el.classList.remove('hidden');
+            el.classList.add('flex');
+            tab.className = "text-emerald-400 border-b-2 border-emerald-400 pb-1 whitespace-nowrap";
+        } else {
+            el.classList.add('hidden');
+            el.classList.remove('flex');
+            tab.className = "text-slate-400 pb-1 whitespace-nowrap";
+        }
+    });
+    if(mode === 'search') setTimeout(() => document.getElementById('searchInput').focus(), 100);
+    if(mode === 'favs') renderFavorites();
+};
+
+// Search Logic
+let searchTimeout;
+document.getElementById('searchInput').addEventListener('input', (e) => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => performSearch(e.target.value), 600);
+});
+
+async function performSearch(query) {
+    if(query.length < 2) return;
+    const resDiv = document.getElementById('searchResults');
+    resDiv.innerHTML = '<div class="text-center mt-4"><i class="fa-solid fa-spinner fa-spin text-emerald-500"></i> searching database...</div>';
+    
     try {
-        chat.innerHTML += `<div id="coachLoading" class="text-xs text-slate-500 italic">Coach is thinking...</div>`;
-        const res = await fetch('/api/coach', {
+        const res = await fetch('/api/search', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ history, query })
+            body: JSON.stringify({ query, mode: 'text' })
         });
         const data = await res.json();
         
-        document.getElementById('coachLoading').remove();
-        // Simple formatter for markdown-like bolding
-        const fmt = data.text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
-        
-        chat.innerHTML += `<div class="bg-slate-900 p-3 rounded-xl rounded-tl-none border border-slate-800 text-sm text-slate-300 mr-auto max-w-[90%]">${fmt}</div>`;
-        chat.scrollTop = chat.scrollHeight;
-    } catch(e) {
-        document.getElementById('coachLoading').innerHTML = "Error contacting coach.";
+        if(!data || data.error || data.length === 0) {
+            resDiv.innerHTML = '<div class="text-center text-slate-500">No results found.</div>';
+        } else {
+            window.lastSearchResults = data;
+            resDiv.innerHTML = data.map((item, index) => `
+                <div onclick="selectFoodFromSearch(${index})" class="flex justify-between items-center p-3 bg-slate-900 border border-slate-800 rounded-xl cursor-pointer hover:border-emerald-500 transition">
+                    <div>
+                        <div class="font-bold text-slate-200">${item.name}</div>
+                        <div class="text-xs text-slate-500">${item.brand ? item.brand + ' • ' : ''}100g: ${Math.round(item.calories)} kcal</div>
+                        <div class="text-[10px] text-emerald-600 uppercase font-bold">${item.source}</div>
+                    </div>
+                    <button class="w-8 h-8 rounded-full bg-emerald-900 text-emerald-400 flex items-center justify-center border border-emerald-800">+</button>
+                </div>
+            `).join('');
+        }
+    } catch (e) {
+        resDiv.innerHTML = '<div class="text-red-400 text-center">Error</div>';
+    }
+}
+
+// --- ANALYZE INGREDIENTS ---
+window.analyzeIngredients = async function() {
+    const input = document.getElementById('analyzeInput').value;
+    if(!input) return alert("Please enter ingredients");
+
+    const resDiv = document.getElementById('analyzeResults');
+    resDiv.innerHTML = '<div class="text-center mt-4"><i class="fa-solid fa-spinner fa-spin text-emerald-500"></i> analyzing...</div>';
+
+    try {
+        const res = await fetch('/api/analyze', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ text: input })
+        });
+        const data = await res.json();
+
+        if(data.error) throw new Error(data.error);
+        if(!data.items || data.items.length === 0) throw new Error("No items identified");
+
+        window.lastAnalyzedItems = data.items;
+
+        resDiv.innerHTML = data.items.map((item, idx) => `
+            <div onclick="selectAnalyzedItem(${idx})" class="p-3 bg-slate-800 rounded-xl border border-slate-700 cursor-pointer hover:border-emerald-500 transition mb-2">
+                <div class="flex justify-between">
+                    <div class="font-bold text-white mb-1">${item.name}</div>
+                    <div class="text-xs text-slate-400">${item.qty}${item.unit}</div>
+                </div>
+                <div class="grid grid-cols-4 text-center text-xs">
+                    <div class="bg-slate-900 p-1 rounded">
+                        <div class="text-slate-500">Kcal</div>
+                        <div>${Math.round(item.calories)}</div>
+                    </div>
+                    <div class="bg-slate-900 p-1 rounded">
+                        <div class="text-slate-500">P</div>
+                        <div class="text-red-400">${Math.round(item.protein)}</div>
+                    </div>
+                    <div class="bg-slate-900 p-1 rounded">
+                        <div class="text-slate-500">C</div>
+                        <div class="text-blue-400">${Math.round(item.carbs)}</div>
+                    </div>
+                    <div class="bg-slate-900 p-1 rounded">
+                        <div class="text-slate-500">F</div>
+                        <div class="text-yellow-400">${Math.round(item.fat)}</div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+
+    } catch (e) {
+        resDiv.innerHTML = '<div class="text-red-400 text-center">Analysis Failed</div>';
     }
 };
 
-[cite_start]// --- EXTENDED EDIT MODAL LOGIC [cite: 4] ---
-function buildEditModalInputs() {
-    // Dynamically build the inputs for vitamins/minerals so index.html isn't huge
-    const createInput = (key) => `
-        <div>
-            <label class="text-[10px] text-slate-500 capitalize">${key.replace(/_/g, ' ')}</label>
-            <input id="val_${key}" class="input-dark" type="number" placeholder="0">
-        </div>`;
+window.selectAnalyzedItem = function(index) {
+    const item = window.lastAnalyzedItems[index];
+    if(!item.base_qty) item.base_qty = item.qty; 
+    prepFoodForEdit(item, true);
+};
 
-    document.getElementById('editVitaminsContainer').innerHTML = NUTRIENT_GROUPS.vitamins.map(createInput).join('');
-    document.getElementById('editMineralsContainer').innerHTML = NUTRIENT_GROUPS.minerals.map(createInput).join('');
-}
+// --- CREATE MANUAL ITEM ---
+window.saveManualItem = function() {
+    const name = document.getElementById('manName').value;
+    if(!name) return alert("Name required");
 
-window.prepFoodForEdit = function(item, isNew) {
-    if(window.stopScanner) window.stopScanner();
+    const qty = parseFloat(document.getElementById('manQty').value) || 100;
+    const unit = document.getElementById('manUnit').value || 'g';
 
-    // Verification Logic: If it's a "Vision" source, the item comes with estimated_weight_g
-    // We treat this weight as the default Qty, but allow user to edit it.
-    let currentQty = item.qty || 100;
-    if(item.estimated_weight_g) currentQty = item.estimated_weight_g;
+    const getVal = (id) => parseFloat(document.getElementById(id).value) || 0;
 
-    // Calculate base values (per 1 unit) to allow scaling
-    const factor = (item.unit === 'g' || item.unit === 'ml') ? (item.base_qty || 100) / 100 : 1;
-    // Note: If coming from search, item values are usually per 100g. 
-    // If coming from Vision, item values are for the WHOLE portion (estimated_weight_g).
-    
-    // Normalize to "Base per 1 unit (1g or 1 serving)" for the logic
-    let baseMult = 1;
-    if(item.source === 'AI Vision' || item.source === 'AI Estimate') {
-         // Vision/AI returns total values for the specific weight
-         baseMult = (item.unit === 'g' && currentQty > 0) ? 1/currentQty : 1; 
-    } else {
-         // Database returns per 100g usually
-         baseMult = 0.01; 
+    const factor = (unit === 'g' || unit === 'ml') ? qty / 100 : qty; 
+
+    const baseCal = getVal('manKcal') / factor;
+    const baseP = getVal('manProt') / factor;
+    const baseC = getVal('manCarb') / factor;
+    const baseF = getVal('manFat') / factor;
+
+    const micros = {};
+    MICRO_KEYS.forEach(key => {
+        micros[key] = getVal(`man_${key}`) / factor;
+    });
+
+    const item = {
+        name, qty, unit,
+        baseCalories: baseCal, baseProtein: baseP, baseCarbs: baseC, baseFat: baseF,
+        micros, source: 'Manual'
+    };
+
+    prepFoodForEdit(item, true);
+};
+
+window.selectFoodFromSearch = function(index) {
+    const item = window.lastSearchResults[index];
+    prepFoodForEdit(item, true);
+};
+
+window.editExistingLog = function(id) {
+    const log = state.logs.find(l => l.id === id);
+    if(log) {
+        if(!log.baseCalories) {
+            const factor = (log.unit === 'g' || log.unit === 'ml') ? (log.qty / 100) : log.qty;
+            log.baseCalories = log.calories / factor;
+            log.baseProtein = log.protein / factor;
+            log.baseCarbs = log.carbs / factor;
+            log.baseFat = log.fat / factor;
+        }
+        prepFoodForEdit(log, false);
     }
+};
+
+function prepFoodForEdit(item, isNew) {
+    // Stop scanner if user selects a food
+    stopScanner();
+
+    const factor = item.base_qty ? (item.base_qty === 100 && (item.unit === 'g'|| item.unit==='ml') ? 1 : item.base_qty) : 1;
 
     state.tempFood = {
         ...item,
         isNew,
-        // Store base values (per 1g) for scaling
-        base: {
-            calories: item.calories * baseMult,
-            protein: item.protein * baseMult,
-            carbs: item.carbs * baseMult,
-            fat: item.fat * baseMult,
-            nutrients: {}
-        }
+        baseCalories: item.baseCalories || (item.calories / factor),
+        baseProtein: item.baseProtein || (item.protein / factor),
+        baseCarbs: item.baseCarbs || (item.carbs / factor),
+        baseFat: item.baseFat || (item.fat / factor),
+        micros: item.micros || {}
     };
 
-    // Flatten nutrients into base
-    const nuts = item.nutrients || {};
-    ALL_NUTRIENTS.forEach(k => {
-        state.tempFood.base.nutrients[k] = (nuts[k] || 0) * baseMult;
-    });
+    const isFav = state.favorites.some(f => f.name === state.tempFood.name);
+    const favBtn = document.getElementById('addToFavBtn');
+    favBtn.innerHTML = isFav ? '<i class="fa-solid fa-heart text-red-500"></i>' : '<i class="fa-regular fa-heart"></i>';
+    favBtn.onclick = () => toggleFavorite();
 
-    openEditModal(currentQty);
-};
+    // Set Meal Dropdown
+    const mealSelect = document.getElementById('editMeal');
+    mealSelect.value = item.meal || state.selectedMeal;
 
-window.createEmptyLog = function() {
-    const emptyItem = {
-        name: "New Food", qty: 100, unit: 'g', source: 'Manual',
-        calories: 0, protein: 0, carbs: 0, fat: 0, nutrients: {}
-    };
-    prepFoodForEdit(emptyItem, true);
-};
+    // Toggle Delete Button
+    document.getElementById('btnDeleteLog').classList.toggle('hidden', isNew);
 
-function openEditModal(qtyOverride) {
-    const f = state.tempFood;
+    openEditModal();
+}
+
+function openEditModal() {
     document.getElementById('editModal').classList.remove('hidden');
-    document.getElementById('editNameVal').value = f.name;
-    document.getElementById('editSource').innerText = f.source || 'Manual';
-    
-    document.getElementById('editQty').value = qtyOverride || f.qty || 100;
-    document.getElementById('editUnit').value = f.unit || 'g';
-    
-    updateEditFields(); // Populate inputs
+    document.getElementById('editName').innerText = state.tempFood.name;
+    document.getElementById('editSource').innerText = state.tempFood.source || 'Database';
+    document.getElementById('editQty').value = state.tempFood.qty || 100;
+    document.getElementById('editUnit').value = state.tempFood.unit || 'g';
+    updateEditPreview();
 }
 
-// Recalculate displayed values when Qty changes
-document.getElementById('editQty').addEventListener('input', updateEditFields);
-document.getElementById('editUnit').addEventListener('change', updateEditFields);
+document.getElementById('editQty').addEventListener('input', updateEditPreview);
+document.getElementById('editUnit').addEventListener('change', updateEditPreview);
 
-function updateEditFields() {
+function updateEditPreview() {
     const qty = parseFloat(document.getElementById('editQty').value) || 0;
-    // For simplicity, assuming g/ml are linear. 
-    const totalFactor = qty; 
+    const unit = document.getElementById('editUnit').value;
+    const factor = (unit === 'g' || unit === 'ml') ? qty / 100 : qty;
 
-    const base = state.tempFood.base;
-    
-    // Set Macros
-    document.getElementById('val_calories').value = Math.round(base.calories * totalFactor);
-    document.getElementById('val_protein').value = (base.protein * totalFactor).toFixed(1);
-    document.getElementById('val_carbs').value = (base.carbs * totalFactor).toFixed(1);
-    document.getElementById('val_fat').value = (base.fat * totalFactor).toFixed(1);
-
-    // Set All Nutrients
-    ALL_NUTRIENTS.forEach(k => {
-        const val = (base.nutrients[k] || 0) * totalFactor;
-        const el = document.getElementById(`val_${k}`);
-        if(el) el.value = val > 0 ? val.toFixed(1) : ''; // Leave empty if 0 for cleaner look
-    });
+    document.getElementById('editKcal').innerText = Math.round(state.tempFood.baseCalories * factor);
+    document.getElementById('editProt').innerText = Math.round(state.tempFood.baseProtein * factor);
+    document.getElementById('editCarbs').innerText = Math.round(state.tempFood.baseCarbs * factor);
+    document.getElementById('editFat').innerText = Math.round(state.tempFood.baseFat * factor);
 }
+
 
 window.saveLog = function() {
     const qty = parseFloat(document.getElementById('editQty').value);
     const unit = document.getElementById('editUnit').value;
-    const name = document.getElementById('editNameVal').value;
     const meal = document.getElementById('editMeal').value;
+    const factor = (unit === 'g' || unit === 'ml') ? qty / 100 : qty;
+    
+    state.selectedMeal = meal;
 
-    // Re-read values from inputs (allowing user to override calculation)
-    const getVal = (id) => parseFloat(document.getElementById(id).value) || 0;
-
-    const nutrients = {};
-    ALL_NUTRIENTS.forEach(k => {
-        nutrients[k] = getVal(`val_${k}`);
-    });
+    // --- TIMESTAMP FIX ---
+    let logTimestamp;
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    
+    if (state.currentDate !== todayStr) {
+        const timePart = now.toISOString().split('T')[1];
+        logTimestamp = `${state.currentDate}T${timePart}`;
+    } else {
+        now.setMilliseconds(now.getMilliseconds() + Math.floor(Math.random() * 999));
+        logTimestamp = now.toISOString();
+    }
 
     const log = {
         id: state.tempFood.isNew ? Math.random().toString(36).substr(2, 9) : state.tempFood.id,
         date: state.currentDate,
-        timestamp: new Date().toISOString(),
-        meal, name, qty, unit,
-        calories: getVal('val_calories'),
-        protein: getVal('val_protein'),
-        carbs: getVal('val_carbs'),
-        fat: getVal('val_fat'),
-        nutrients: nutrients, // New expanded structure
-        // Keep base for future edits if needed, though simpler to just re-calc on edit
-        base: state.tempFood.base 
+        timestamp: (state.tempFood.isNew || !state.tempFood.timestamp) ? logTimestamp : state.tempFood.timestamp,
+        meal: meal,
+        name: state.tempFood.name,
+        qty, unit,
+        calories: state.tempFood.baseCalories * factor,
+        protein: state.tempFood.baseProtein * factor,
+        carbs: state.tempFood.baseCarbs * factor,
+        fat: state.tempFood.baseFat * factor,
+        micros: state.tempFood.micros, 
+        baseCalories: state.tempFood.baseCalories,
+        baseProtein: state.tempFood.baseProtein,
+        baseCarbs: state.tempFood.baseCarbs,
+        baseFat: state.tempFood.baseFat
     };
 
-    if (state.tempFood.isNew) state.logs.push(log);
-    else {
+    if (state.tempFood.isNew) {
+        state.logs.push(log);
+    } else {
         const idx = state.logs.findIndex(l => l.id === log.id);
-        if (idx !== -1) state.logs[idx] = log;
+        if (idx !== -1) {
+            if (state.logs[idx].timestamp) log.timestamp = state.logs[idx].timestamp;
+            state.logs[idx] = log;
+        }
     }
 
     localStorage.setItem('foodlog_logs', JSON.stringify(state.logs));
     closeEditModal();
-    document.getElementById('addModal').classList.add('translate-y-full');
+    
+    if (state.activeTab !== 'analyze') {
+        document.getElementById('addModal').classList.add('translate-y-full');
+    }
+    
     init();
 };
 
-[cite_start]// --- UPDATED MICROS VIEW [cite: 1] ---
+
+window.deleteLog = function() {
+    if (!state.tempFood || state.tempFood.isNew) return;
+    if (confirm("Delete this item?")) {
+        const idx = state.logs.findIndex(l => l.id === state.tempFood.id);
+        if (idx !== -1) {
+            state.logs.splice(idx, 1);
+            localStorage.setItem('foodlog_logs', JSON.stringify(state.logs));
+        }
+        closeEditModal();
+        init();
+    }
+};
+
+// --- FAVORITES ---
+function toggleFavorite() {
+    const existingIdx = state.favorites.findIndex(f => f.name === state.tempFood.name);
+    if (existingIdx !== -1) {
+        state.favorites.splice(existingIdx, 1);
+        document.getElementById('addToFavBtn').innerHTML = '<i class="fa-regular fa-heart"></i>';
+    } else {
+        const meal = document.getElementById('editMeal').value;
+        const favItem = { ...state.tempFood, meal }; 
+        state.favorites.push(favItem);
+        document.getElementById('addToFavBtn').innerHTML = '<i class="fa-solid fa-heart text-red-500"></i>';
+    }
+    localStorage.setItem('foodlog_favs', JSON.stringify(state.favorites));
+    renderFavorites();
+}
+
+function renderFavorites() {
+    const list = document.getElementById('favList');
+    list.innerHTML = state.favorites.map((item, index) => `
+        <div onclick="selectFav(${index})" class="flex justify-between items-center p-3 bg-slate-900 border border-slate-800 rounded-xl cursor-pointer">
+            <div>
+                <div class="font-bold text-slate-200">${item.name}</div>
+                <div class="text-xs text-slate-500">${Math.round(item.baseCalories)} kcal / 100g</div>
+            </div>
+            <button class="w-8 h-8 rounded-full bg-emerald-900 text-emerald-400 flex items-center justify-center">+</button>
+        </div>
+    `).join('');
+}
+
+window.selectFav = function(index) {
+    prepFoodForEdit(state.favorites[index], true);
+};
+
+// --- MICROS & DETAILS ---
 window.openMicros = function() {
     const dayLogs = state.logs.filter(l => l.date === state.currentDate);
     const totals = {};
-
+    
     dayLogs.forEach(log => {
-        ALL_NUTRIENTS.forEach(k => {
-            const val = log.nutrients ? (log.nutrients[k] || 0) : 0; // Log values are already total
-            totals[k] = (totals[k] || 0) + val;
-        });
+        if(log.micros) {
+            const factor = (log.unit === 'g' || log.unit === 'ml') ? (log.qty / 100) : log.qty;
+            Object.keys(log.micros).forEach(key => {
+                totals[key] = (totals[key] || 0) + (log.micros[key] * factor);
+            });
+        }
     });
 
-    const renderGroup = (title, keys) => `
-        <div class="mb-4">
-            <h4 class="text-emerald-400 font-bold mb-2 uppercase text-xs">${title}</h4>
-            ${keys.map(k => {
-                const val = totals[k] || 0;
-                return `<div class="flex justify-between border-b border-slate-800 py-1">
-                    <span class="text-slate-400 capitalize">${k.replace(/_/g, ' ')}</span>
-                    <span class="text-white">${Math.round(val*10)/10}</span>
-                </div>`;
-            }).join('')}
-        </div>
-    `;
+    const groups = {
+        'Macro Details': ['sugars', 'fiber', 'saturated_fat', 'monounsaturated_fat', 'polyunsaturated_fat'],
+        'Minerals': ['sodium', 'potassium', 'calcium', 'magnesium', 'zinc', 'iron', 'phosphorus', 'iodine', 'selenium', 'chloride', 'copper', 'chromium', 'molybdenum', 'manganese'],
+        'Vitamins': ['vitamin_a', 'vitamin_c', 'vitamin_d', 'vitamin_e', 'vitamin_k', 'thiamin', 'riboflavin', 'niacin', 'vitamin_b6', 'folic_acid', 'vitamin_b12', 'biotin', 'pantothenic_acid'],
+        'Other': ['caffeine', 'water']
+    };
+
+    const labels = {
+        sugars: 'Sugars (g)', fiber: 'Fiber (g)', saturated_fat: 'Sat. Fat (g)',
+        monounsaturated_fat: 'Mono. Fat (g)', polyunsaturated_fat: 'Poly. Fat (g)',
+        sodium: 'Sodium (mg)', potassium: 'Potassium (mg)', chloride: 'Chloride (mg)',
+        caffeine: 'Caffeine (mg)', water: 'Water (g)',
+        vitamin_a: 'Vit A (µg)', thiamin: 'B1 Thiamin (mg)', riboflavin: 'B2 Riboflavin (mg)',
+        vitamin_b6: 'Vit B6 (mg)', vitamin_b12: 'Vit B12 (µg)', biotin: 'Biotin (µg)',
+        folic_acid: 'Folic Acid (µg)', niacin: 'Niacin (mg)', pantothenic_acid: 'Pantothenic (mg)',
+        vitamin_c: 'Vit C (mg)', vitamin_d: 'Vit D3 (µg)', vitamin_e: 'Vit E (mg)',
+        vitamin_k: 'Vit K1 (µg)', calcium: 'Calcium (mg)', magnesium: 'Magnesium (mg)',
+        zinc: 'Zinc (mg)', chromium: 'Chromium (µg)', molybdenum: 'Molybdenum (µg)',
+        iodine: 'Iodine (µg)', selenium: 'Selenium (µg)', phosphorus: 'Phosphorus (mg)',
+        manganese: 'Manganese (mg)', iron: 'Iron (mg)', copper: 'Copper (mg)'
+    };
 
     let html = '';
-    html += renderGroup('Details (g/mg)', NUTRIENT_GROUPS.details);
-    html += renderGroup('Vitamins', NUTRIENT_GROUPS.vitamins);
-    html += renderGroup('Minerals', NUTRIENT_GROUPS.minerals);
+    
+    Object.keys(groups).forEach(groupName => {
+        html += `<h4 class="text-xs font-bold text-emerald-500 uppercase tracking-wider mb-2 mt-4 first:mt-0">${groupName}</h4>`;
+        html += `<div class="space-y-1">`;
+        groups[groupName].forEach(key => {
+            const val = totals[key] || 0;
+            // Simple check to hide zero values if preferred, but user might want to see them.
+            // Keeping them visible for now.
+            html += `
+                <div class="flex justify-between items-center bg-slate-800 p-2 rounded-lg border border-slate-700">
+                    <span class="text-slate-400 text-xs">${labels[key] || key}</span>
+                    <div class="text-right">
+                        <div class="text-white font-bold text-sm">${Math.round(val * 10) / 10}</div>
+                    </div>
+                </div>
+            `;
+        });
+        html += `</div>`;
+    });
 
     document.getElementById('microList').innerHTML = html;
     document.getElementById('microsModal').classList.remove('hidden');
 };
 
-// ... keep existing utils (closeAddModal, closeEditModal, etc.) ...
-[cite_start]// Ensure `handleVision` calls `prepFoodForEdit(data, true)` to trigger the verification step [cite: 7]
+// --- MEAL PLANNER ---
+window.generateMealPlan = async function() {
+    const ingredients = document.getElementById('plannerInput').value;
+    if(!ingredients) return alert("Enter ingredients");
+    
+    document.getElementById('plannerInput').disabled = true;
+    
+    try {
+        const res = await fetch('/api/plan-meal', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ ingredients })
+        });
+        const data = await res.json();
+        
+        document.getElementById('planTitle').innerText = data.mealName;
+        document.getElementById('planRecipe').innerText = data.recipe;
+        document.getElementById('planGrocery').innerHTML = data.groceryList.map(i => `<li>${i}</li>`).join('');
+        document.getElementById('plannerResult').classList.remove('hidden');
+    } catch(e) {
+        alert("Failed to generate plan");
+    }
+    document.getElementById('plannerInput').disabled = false;
+};
+
+
+// --- PRO SCANNER IMPLEMENTATION (ZXing) ---
+let codeReader = null;
+let currentStream = null;
+
+window.startScanner = async function() {
+    const container = document.getElementById('scanner-container');
+    container.classList.remove('hidden');
+    container.innerHTML = `
+        <video id="video" style="width:100%; height:100%; object-fit:cover;" autoplay muted playsinline></video>
+        <div class="absolute inset-0 border-2 border-red-500/50 pointer-events-none" style="top:20%; bottom:20%; left:10%; right:10%;"></div>
+        <div class="absolute bottom-2 left-0 right-0 text-center text-xs text-white bg-black/50 p-1">Align barcode in box</div>
+    `;
+
+    // 1. Initialize Reader
+    if (!codeReader) {
+        codeReader = new ZXingBrowser.BrowserMultiFormatReader();
+    }
+
+    try {
+        // 2. Select Camera (Environment/Back Camera)
+        const videoInputDevices = await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
+        const selectedDeviceId = videoInputDevices.find(device => device.label.toLowerCase().includes('back'))?.deviceId 
+                                || videoInputDevices[0].deviceId;
+
+        // 3. Configure Hints
+        const hints = new Map();
+        const formats = [
+            ZXing.BarcodeFormat.EAN_13,
+            ZXing.BarcodeFormat.EAN_8, 
+            ZXing.BarcodeFormat.UPC_A,
+            ZXing.BarcodeFormat.UPC_E,
+            ZXing.BarcodeFormat.CODE_128
+        ];
+        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+        hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+
+        // 4. Start Decoding
+        const controls = await codeReader.decodeFromVideoDevice(
+            selectedDeviceId, 
+            'video', 
+            (result, err, controls) => {
+                if (result) {
+                    handleScanSuccess(result.text, controls);
+                }
+            },
+            {
+                hints: hints,
+                timeBetweenScansMillis: 200
+            }
+        );
+
+        window.activeScannerControls = controls;
+
+        // 5. Apply Focus
+        const videoElement = document.getElementById('video');
+        if (videoElement && videoElement.srcObject) {
+            currentStream = videoElement.srcObject;
+            const track = currentStream.getVideoTracks()[0];
+            const capabilities = track.getCapabilities();
+            
+            if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
+                await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+            } else if (capabilities.focusMode && capabilities.focusMode.includes('macro')) {
+                 await track.applyConstraints({ advanced: [{ focusMode: 'macro' }] });
+            }
+        }
+
+    } catch (err) {
+        console.error(err);
+        container.innerHTML = `<div class="text-red-400 p-4 text-center">Camera Error: ${err.message}<br>Check permissions.</div>`;
+    }
+};
+
+function handleScanSuccess(text, controls) {
+    if(controls) controls.stop();
+    stopScanner();
+
+    document.getElementById('searchInput').value = text;
+    performSearch(text);
+
+    fetch('/api/search', {
+         method: 'POST',
+         headers: {'Content-Type': 'application/json'},
+         body: JSON.stringify({ query: text, mode: 'barcode' })
+    }).then(r => r.json()).then(data => {
+        if(data.length > 0) {
+            prepFoodForEdit(data[0], true);
+        } else {
+            alert("Product not found via Barcode.");
+        }
+    });
+}
+
+window.stopScanner = function() {
+    if (window.activeScannerControls) {
+        window.activeScannerControls.stop();
+        window.activeScannerControls = null;
+    }
+    
+    if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+        currentStream = null;
+    }
+    
+    const container = document.getElementById('scanner-container');
+    if (container) {
+        container.innerHTML = '';
+        container.classList.add('hidden');
+    }
+};
+
+
+// --- VISION ---
+window.triggerVision = function(type) {
+    if (type === 'camera') document.getElementById('visionCam').click();
+    else document.getElementById('visionGal').click();
+};
+
 window.handleVision = async function(input) {
     if (!input.files[0]) return;
-    document.getElementById('searchResults').innerHTML = '<div class="text-center mt-10">AI analyzing...</div>';
+    document.getElementById('searchResults').innerHTML = '<div class="text-center mt-10"><i class="fa-solid fa-brain fa-bounce text-emerald-500 text-2xl"></i><br>AI is analyzing photo...</div>';
 
     const formData = new FormData();
     formData.append('image', input.files[0]);
@@ -299,16 +741,103 @@ window.handleVision = async function(input) {
     try {
         const res = await fetch('/api/vision', { method: 'POST', body: formData });
         const data = await res.json();
+        
         if (data.name) {
-             // Pass straight to edit for "Verify" step
-            prepFoodForEdit({
-                ...data,
-                source: 'AI Vision'
-            }, true);
+            const weight = data.estimated_weight_g || 100;
+            const factor = weight / 100;
+            const food = {
+                name: data.name,
+                qty: weight,
+                unit: 'g',
+                source: 'AI Vision',
+                baseCalories: data.calories / factor,
+                baseProtein: data.protein / factor,
+                baseCarbs: data.carbs / factor,
+                baseFat: data.fat / factor,
+                micros: data.micros || {}
+            };
+            prepFoodForEdit(food, true);
         }
     } catch (e) {
-        alert("Vision failed");
+        document.getElementById('searchResults').innerHTML = 'Error analyzing image';
     }
+};
+
+// --- UTILS ---
+window.openProfile = () => document.getElementById('profileModal').classList.remove('translate-y-full');
+window.closeProfile = () => document.getElementById('profileModal').classList.add('translate-y-full');
+
+window.closeAddModal = () => {
+    stopScanner(); // Ensure camera turns off
+    document.getElementById('addModal').classList.add('translate-y-full');
+};
+
+window.closeEditModal = () => {
+    stopScanner(); // Just in case
+    document.getElementById('editModal').classList.add('hidden');
+};
+
+window.openPlanner = () => document.getElementById('plannerModal').classList.remove('translate-y-full');
+window.closePlanner = () => document.getElementById('plannerModal').classList.add('translate-y-full');
+
+window.changeDate = (offset) => {
+    const d = new Date(state.currentDate);
+    d.setDate(d.getDate() + offset);
+    state.currentDate = d.toISOString().split('T')[0];
+    init();
+};
+
+window.exportJSON = () => {
+    const today = new Date();
+    const pastDate = new Date();
+    pastDate.setDate(today.getDate() - 7); 
+
+    const recentLogs = state.logs.filter(l => {
+        const logDate = new Date(l.date);
+        return logDate >= pastDate;
+    });
+
+    const exportData = recentLogs.map((l, index) => {
+        const factor = (l.unit === 'g' || l.unit === 'ml') ? (l.qty / 100) : l.qty;
+        
+        let dateObj;
+        if (l.timestamp) {
+            dateObj = new Date(l.timestamp);
+        } else {
+            dateObj = new Date(l.date); 
+            dateObj.setHours(12, 0, 0, 0); 
+            dateObj.setSeconds(index % 60); 
+        }
+
+        const dateString = dateObj.toISOString();
+
+        const item = {
+            date: dateString,
+            name: l.name,
+            calories: Math.round(l.calories),
+            protein: Math.round(l.protein * 10) / 10,
+            carbs: Math.round(l.carbs * 10) / 10,
+            fat: Math.round(l.fat * 10) / 10
+        };
+        
+        MICRO_KEYS.forEach(key => {
+            if (l.micros && l.micros[key]) {
+                item[key] = Math.round((l.micros[key] * factor) * 100) / 100;
+            }
+        });
+
+        return item;
+    });
+
+    const finalOutput = { "logs": exportData };
+
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(finalOutput));
+    const link = document.createElement("a");
+    link.setAttribute("href", dataStr);
+    link.setAttribute("download", `foodlog_sync.json`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 };
 
 init();
