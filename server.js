@@ -82,13 +82,11 @@ app.post('/api/search', async (req, res) => {
     // 1. OPEN FOOD FACTS
     try {
         let url;
-        // Request comprehensive fields
-        const fields = 'product_name,product_name_de,brands,nutriments,code,_id';
-        
+        // FIX: Removed specific fields parameter to ensure we get ALL extended nutriments (caffeine, etc)
         if (mode === 'barcode') {
-            url = `https://world.openfoodfacts.org/api/v2/product/${query}.json?fields=${fields}`;
+            url = `https://world.openfoodfacts.org/api/v2/product/${query}.json`;
         } else {
-            url = `https://de.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=10&fields=${fields}`;
+            url = `https://de.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=10`;
         }
 
         const response = await axios.get(url, { timeout: 8000 });
@@ -108,7 +106,7 @@ app.post('/api/search', async (req, res) => {
                 protein: p.nutriments?.proteins || 0,
                 carbs: p.nutriments?.carbohydrates || 0,
                 fat: p.nutriments?.fat || 0,
-                micros: extractMicros(p.nutriments), // EXTRACT ALL
+                micros: extractMicros(p.nutriments),
                 unit: 'g', 
                 base_qty: 100,
                 source: 'OpenFoodFacts'
@@ -154,7 +152,7 @@ app.post('/api/search', async (req, res) => {
     }
 });
 
-// --- API: Analyze Ingredients (Itemized) ---
+// --- API: Analyze Ingredients ---
 app.post('/api/analyze', async (req, res) => {
     const { text } = req.body;
     try {
@@ -178,25 +176,20 @@ app.post('/api/analyze', async (req, res) => {
     }
 });
 
-// --- API: Ask AI Coach (Dynamic Stats) ---
+// --- API: Ask AI Coach ---
 app.post('/api/ask-coach', async (req, res) => {
     const { query, logs, user } = req.body;
     try {
-        // Limit logs to last 30 days to save tokens, or send summaries
         const contextLogs = logs.slice(0, 100); 
-
         const completion = await openai.chat.completions.create({
             model: "gpt-4o-mini",
             messages: [{
                 role: "system",
-                content: `You are an expert nutrition coach. You have access to the user's detailed food logs (including micros, specific fats, fiber, caffeine, etc.) and profile.
-                
+                content: `You are an expert nutrition coach.
                 User Query: "${query}"
                 
                 If the user asks for a specific graph or chart, provide a Markdown table representing the data points, and then a brief textual analysis.
                 If they ask "How is my caffeine?", look at the 'caffeine' field in micros.
-                If they ask about "Heart health", look at saturated vs mono/poly fats, fiber, and sodium.
-                
                 Be concise, empathetic, and data-driven.`
             }, {
                 role: "user",
