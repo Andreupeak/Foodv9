@@ -278,7 +278,7 @@ window.setSearchMode = function(mode) {
 let searchTimeout;
 document.getElementById('searchInput').addEventListener('input', (e) => {
     clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => performSearch(e.target.value), 400); // Faster input response
+    searchTimeout = setTimeout(() => performSearch(e.target.value), 600); // Back to 600ms for stability
 });
 
 async function performSearch(query) {
