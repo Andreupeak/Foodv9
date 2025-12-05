@@ -77,20 +77,24 @@ function extractMicros(n) {
 app.post('/api/search', async (req, res) => {
     const { query, mode } = req.body;
 
-    // 1. OPEN FOOD FACTS (Optimized for Speed)
+    // 1. OPEN FOOD FACTS DATABASE
     try {
         let url;
+        // Limit fields to improve speed
         const fields = 'product_name,product_name_de,brands,nutriments,code,_id';
         
         if (mode === 'barcode') {
             url = `https://world.openfoodfacts.org/api/v2/product/${query}.json?fields=${fields}`;
         } else {
-            // OPTIMIZATION: sort_by=unique_scans_n (Popularity) + page_size=6
-            // This hits cached "hot" items first and reduces payload size
-            url = `https://de.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=6&sort_by=unique_scans_n&fields=${fields}`;
+            // Use standard search.pl.
+            // page_size=10 is standard.
+            // We do NOT use complex sorts that might slow down the DB.
+            url = `https://de.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=10&fields=${fields}`;
         }
 
-        const response = await axios.get(url, { timeout: 5000 });
+        // CRITICAL: Increased timeout to 15 seconds. 
+        // OFF can be slow. We prefer waiting for real data over fallback.
+        const response = await axios.get(url, { timeout: 15000 });
         let products = [];
 
         if (mode === 'barcode' && (response.data.status === 1 || response.data.product)) {
@@ -115,21 +119,23 @@ app.post('/api/search', async (req, res) => {
             return res.json(results);
         }
     } catch (e) {
-        console.log(`OFF Error/Timeout (${e.message}), falling back to AI...`);
+        console.log(`OFF Database connection failed or timed out: ${e.message}`);
+        // If it was a barcode scan, we fail immediately so user knows.
+        if (mode === 'barcode') {
+            return res.status(404).json({ error: 'Barcode not found in database' });
+        }
+        // For text search, we proceed to AI only if DB actually failed/returned nothing.
     }
 
-    if (mode === 'barcode') {
-        return res.status(404).json({ error: 'Barcode not found' });
-    }
-
-    // 2. AI FALLBACK
+    // 2. AI FALLBACK (Only executes if Database returned 0 items or threw an error)
     try {
-        console.log(`Using AI fallback for: ${query}`);
+        console.log(`Product not in DB (or DB error), using AI estimate for: ${query}`);
         const completion = await openai.chat.completions.create({
             model: "gpt-4o-mini",
             messages: [{
                 role: "user",
-                content: `User searched for "${query}". Return a JSON object for 1 standard serving (or 100g if generic).
+                content: `User searched for "${query}". It was not found in the German food database. 
+                Return a JSON object for 1 standard serving (or 100g if generic).
                 Include name, calories, protein, carbs, fat.
                 Also estimate these micros (mg/ug/g where appropriate): 
                 [sugars, fiber, saturated_fat, monounsaturated_fat, polyunsaturated_fat, sodium, potassium, chloride, water, caffeine]
