@@ -25,23 +25,34 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// --- HELPER: Extract Nutrients (Expanded) ---
-function extractNutrients(n) {
+// --- HELPER: Extract Micros ---
+function extractMicros(n) {
     if (!n) return {};
     return {
-        // Extended Macros & Specifics
-        sugar: n['sugars_100g'] || n['sugars_value'] || 0,
+        // --- Macro Details ---
+        sugars: n['sugars_100g'] || n['sugars_value'] || 0,
         fiber: n['fiber_100g'] || n['fiber_value'] || 0,
         saturated_fat: n['saturated-fat_100g'] || n['saturated-fat_value'] || 0,
-        monounsaturated_fat: n['monounsaturated-fat_100g'] || 0,
-        polyunsaturated_fat: n['polyunsaturated-fat_100g'] || 0,
-        sodium: n['sodium_100g'] || 0,
-        potassium: n['potassium_100g'] || 0,
-        chloride: n['chloride_100g'] || 0,
-        caffeine: n['caffeine_100g'] || 0,
-        water: n['water_100g'] || 0,
+        monounsaturated_fat: n['monounsaturated-fat_100g'] || n['monounsaturated-fat_value'] || 0,
+        polyunsaturated_fat: n['polyunsaturated-fat_100g'] || n['polyunsaturated-fat_value'] || 0,
+        
+        // --- Minerals/Electrolytes ---
+        sodium: n['sodium_100g'] || n['sodium_value'] || 0,
+        potassium: n['potassium_100g'] || n['potassium_value'] || 0,
+        chloride: n['chloride_100g'] || n['chloride_value'] || 0,
+        calcium: n['calcium_100g'] || n['calcium_value'] || 0,
+        magnesium: n['magnesium_100g'] || n['magnesium_value'] || 0,
+        zinc: n['zinc_100g'] || n['zinc_value'] || 0,
+        phosphorus: n['phosphorus_100g'] || 0,
+        iron: n['iron_100g'] || n['iron_value'] || 0,
+        copper: n['copper_100g'] || 0,
+        manganese: n['manganese_100g'] || 0,
+        iodine: n['iodine_100g'] || 0,
+        selenium: n['selenium_100g'] || 0,
+        chromium: n['chromium_100g'] || 0,
+        molybdenum: n['molybdenum_100g'] || 0,
 
-        // Vitamins
+        // --- Vitamins ---
         vitamin_a: n['vitamin-a_100g'] || n['vitamin-a_value'] || 0,
         thiamin: n['vitamin-b1_100g'] || n['thiamin_100g'] || 0,
         riboflavin: n['vitamin-b2_100g'] || n['riboflavin_100g'] || 0,
@@ -55,19 +66,10 @@ function extractNutrients(n) {
         vitamin_d: n['vitamin-d_100g'] || n['vitamin-d_value'] || 0,
         vitamin_e: n['vitamin-e_100g'] || n['vitamin-e_value'] || 0,
         vitamin_k: n['vitamin-k_100g'] || n['phylloquinone_100g'] || 0,
-        
-        // Minerals
-        calcium: n['calcium_100g'] || n['calcium_value'] || 0,
-        magnesium: n['magnesium_100g'] || n['magnesium_value'] || 0,
-        zinc: n['zinc_100g'] || n['zinc_value'] || 0,
-        chromium: n['chromium_100g'] || 0,
-        molybdenum: n['molybdenum_100g'] || 0,
-        iodine: n['iodine_100g'] || 0,
-        selenium: n['selenium_100g'] || 0,
-        phosphorus: n['phosphorus_100g'] || 0,
-        manganese: n['manganese_100g'] || 0,
-        iron: n['iron_100g'] || n['iron_value'] || 0,
-        copper: n['copper_100g'] || 0
+
+        // --- Other ---
+        caffeine: n['caffeine_100g'] || n['caffeine_value'] || 0,
+        water: n['water_100g'] || n['water_value'] || 0
     };
 }
 
@@ -75,11 +77,11 @@ function extractNutrients(n) {
 app.post('/api/search', async (req, res) => {
     const { query, mode } = req.body;
 
-    // 1. OPEN FOOD FACTS
+    // 1. OPEN FOOD FACTS (Optimized for Germany/Speed)
     try {
         let url;
-        [cite_start]// Expanded fields list [cite: 1]
-        const fields = 'product_name,product_name_de,brands,nutriments,code,_id,serving_size,quantity';
+        // Include new fields in the request
+        const fields = 'product_name,product_name_de,brands,nutriments,code,_id';
         
         if (mode === 'barcode') {
             url = `https://world.openfoodfacts.org/api/v2/product/${query}.json?fields=${fields}`;
@@ -104,8 +106,7 @@ app.post('/api/search', async (req, res) => {
                 protein: p.nutriments?.proteins || 0,
                 carbs: p.nutriments?.carbohydrates || 0,
                 fat: p.nutriments?.fat || 0,
-                // Extract all new nutrients
-                nutrients: extractNutrients(p.nutriments),
+                micros: extractMicros(p.nutriments),
                 unit: 'g', 
                 base_qty: 100,
                 source: 'OpenFoodFacts'
@@ -127,12 +128,13 @@ app.post('/api/search', async (req, res) => {
             model: "gpt-4o-mini",
             messages: [{
                 role: "user",
-                content: `User searched for "${query}". Not found in DB. 
-                Return JSON for 1 standard serving (or 100g if generic).
-                Include basic macros (kcal, p, c, f).
-                Also estimate (mg/ug/g): sugar, fiber, saturated_fat, monounsaturated_fat, polyunsaturated_fat, sodium, potassium, chloride, caffeine, water, vitamin_a, thiamin, riboflavin, vitamin_b6, vitamin_b12, biotin, folic_acid, niacin, pantothenic_acid, vitamin_c, vitamin_d, vitamin_e, vitamin_k, calcium, magnesium, zinc, chromium, molybdenum, iodine, selenium, phosphorus, manganese, iron, copper.
-                Response format: { "name":Str, "base_qty":Num, "unit":Str, "calories":Num, "protein":Num, "carbs":Num, "fat":Num, "nutrients":{...} }
-                Strict JSON.`
+                content: `User searched for "${query}". Return a JSON object for 1 standard serving (or 100g if generic).
+                Include name, calories, protein, carbs, fat.
+                Also estimate these micros (mg/ug/g where appropriate): 
+                [sugars, fiber, saturated_fat, monounsaturated_fat, polyunsaturated_fat, sodium, potassium, chloride, water, caffeine]
+                AND [vitamin_a, thiamin, riboflavin, vitamin_b6, vitamin_b12, biotin, folic_acid, niacin, pantothenic_acid, vitamin_c, vitamin_d, vitamin_e, vitamin_k, calcium, magnesium, zinc, chromium, molybdenum, iodine, selenium, phosphorus, manganese, iron, copper].
+                Response format: { "name":Str, "base_qty":Num, "unit":Str, "calories":Num, "protein":Num, "carbs":Num, "fat":Num, "micros":{...} }
+                Strict JSON only.`
             }]
         });
 
@@ -146,7 +148,7 @@ app.post('/api/search', async (req, res) => {
     }
 });
 
-// --- API: Analyze Ingredients ---
+// --- API: Analyze Ingredients (Itemized) ---
 app.post('/api/analyze', async (req, res) => {
     const { text } = req.body;
     try {
@@ -154,15 +156,18 @@ app.post('/api/analyze', async (req, res) => {
             model: "gpt-4o-mini",
             messages: [{
                 role: "system",
-                content: "Nutrition analyzer. Break down input into items."
+                content: "You are a nutrition analyzer. Break down the input into individual ingredients with nutrition info."
             }, {
                 role: "user",
-                content: `Analyze: "${text}".
-                Return JSON "items" array.
+                content: `Analyze this list: "${text}".
+                Return a JSON object containing an array called "items". 
+                Each item should represent one ingredient from the list with its nutrition for the specified quantity.
                 Include Name, Qty, Unit, Kcal, P, C, F.
-                Include "nutrients" object with estimated: sugar, fiber, saturated_fat, monounsaturated_fat, polyunsaturated_fat, sodium, potassium, chloride, caffeine, water, + all vitamins/minerals.
-                JSON Format: { "items": [ { "name":Str, "qty":Num, "unit":Str, "calories":Num, "protein":Num, "carbs":Num, "fat":Num, "nutrients":{...} }, ... ] }
-                Strict JSON.`
+                Include "micros" object with estimated: 
+                [sugars, fiber, saturated_fat, monounsaturated_fat, polyunsaturated_fat, sodium, potassium, chloride, water, caffeine, vitamin_a, thiamin, riboflavin, vitamin_b6, vitamin_b12, biotin, folic_acid, niacin, pantothenic_acid, vitamin_c, vitamin_d, vitamin_e, vitamin_k, calcium, magnesium, zinc, chromium, molybdenum, iodine, selenium, phosphorus, manganese, iron, copper]
+                
+                JSON Format: { "items": [ { "name":Str, "qty":Num, "unit":Str, "calories":Num, "protein":Num, "carbs":Num, "fat":Num, "micros":{...} }, ... ] }
+                Strict JSON only. No markdown.`
             }]
         });
         const content = completion.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -181,12 +186,12 @@ app.post('/api/plan-meal', async (req, res) => {
             model: "gpt-4o-mini",
             messages: [{
                 role: "system", 
-                content: "Meal planner. JSON only."
+                content: "You are a meal planner. Create a meal using the provided ingredients. Return strictly JSON."
             }, {
                 role: "user",
-                content: `Ingredients: ${ingredients}.
-                Suggest meal name, recipe, grocery list.
-                JSON Format: { "mealName": String, "recipe": String, "groceryList": [String] }`
+                content: `I have these ingredients: ${ingredients}.
+                Suggest a meal name, a brief recipe, and a grocery list.
+                JSON Format: { "mealName": String, "recipe": String, "groceryList": [String, String] }`
             }]
         });
         const content = completion.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -208,10 +213,10 @@ app.post('/api/vision', upload.single('image'), async (req, res) => {
                 role: 'user',
                 content: [
                     { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } },
-                    { type: 'text', text: 'Identify food. Estimate portion weight. Return JSON for WHOLE portion: { "name":Str, "estimated_weight_g":Num, "calories":Num, "protein":Num, "carbs":Num, "fat":Num, "nutrients": { "sugar":Num, "fiber":Num, "saturated_fat":Num, "vitamin_a":Num, "vitamin_c":Num, "calcium":Num, "iron":Num, ...include all other micros if possible } }.' }
+                    { type: 'text', text: 'Identify food & estimate portion. Return JSON: { "name":Str, "estimated_weight_g":Num, "calories":Num, "protein":Num, "carbs":Num, "fat":Num, "micros": { "sugars":Num, "fiber":Num, "saturated_fat":Num, "sodium":Num, "calcium":Num, "iron":Num, "vitamin_c":Num } }. Values for WHOLE portion.' }
                 ]
             }],
-            max_tokens: 800
+            max_tokens: 500
         });
 
         fs.unlinkSync(req.file.path);
@@ -219,28 +224,6 @@ app.post('/api/vision', upload.single('image'), async (req, res) => {
         res.json(JSON.parse(content));
     } catch (err) {
         if (req.file) fs.unlinkSync(req.file.path);
-        res.status(500).json({ error: err.message });
-    }
-});
-
-[cite_start]// --- API: AI Coach (NEW) [cite: 6] ---
-app.post('/api/coach', async (req, res) => {
-    const { history, query } = req.body;
-    try {
-        const completion = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
-            messages: [{
-                role: "system",
-                content: "You are a professional nutrition coach. You have access to the user's detailed nutrition logs including macros, micros, sugars, fibers, fats, etc. Analyze the data deeply. If asked for graphs, describe the trend in detail or provide a text-based representation. Be encouraging but factual."
-            }, {
-                role: "user",
-                content: `Here are my logs: ${JSON.stringify(history)}. 
-                User Question: "${query}".
-                Provide a detailed answer.`
-            }]
-        });
-        res.json({ text: completion.choices[0].message.content });
-    } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
