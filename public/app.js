@@ -10,12 +10,12 @@ const state = {
     selectedMeal: 'Breakfast',
     tempFood: null,
     activeTab: 'search',
-    chatHistory: [] // Store AI Coach chat
+    chatHistory: [] 
 };
 
 const MEALS = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
 
-// --- NUTRIENT DEFINITIONS (Grouped for Display) ---
+// --- NUTRIENT DEFINITIONS ---
 const MICRO_GROUPS = {
     'Breakdown': ['sugar', 'fiber', 'saturated_fat', 'monounsaturated_fat', 'polyunsaturated_fat', 'trans_fat', 'cholesterol'],
     'Electrolytes & Stimulants': ['sodium', 'potassium', 'caffeine', 'water'],
@@ -23,7 +23,7 @@ const MICRO_GROUPS = {
     'Minerals': ['calcium', 'magnesium', 'iron', 'zinc', 'phosphorus', 'iodine', 'selenium', 'chloride', 'manganese', 'copper', 'chromium', 'molybdenum']
 };
 
-// Flattened keys for data processing
+// FIX: Flatten keys for export and saving
 const ALL_MICROS = Object.values(MICRO_GROUPS).flat();
 
 // --- INIT ---
@@ -31,7 +31,7 @@ function init() {
     renderDate();
     renderMeals();
     renderDashboard();
-    renderManualInputs(); // Prepare the manual edit inputs
+    renderManualInputs(); 
 }
 
 // --- RENDERERS ---
@@ -49,9 +49,6 @@ function renderMeals() {
     MEALS.forEach(meal => {
         const mealLogs = dayLogs.filter(l => l.meal === meal);
         const mealCals = mealLogs.reduce((acc, curr) => acc + (curr.calories || 0), 0);
-        
-        // Count specific interesting micros if present to show user "rich data" exists
-        const hasRichData = mealLogs.some(l => l.micros && (l.micros.fiber > 0 || l.micros.caffeine > 0));
 
         let html = `
             <div class="bg-slate-900 rounded-2xl border border-slate-800 p-4">
@@ -147,11 +144,9 @@ window.askCoach = async function() {
     if(!query) return;
 
     const container = document.getElementById('coachChatContainer');
-    // User Msg
     container.innerHTML += `<div class="bg-slate-800 p-3 rounded-xl rounded-tr-none mb-2 ml-10 text-right text-sm">${query}</div>`;
     input.value = '';
     
-    // Loading
     const loadingId = 'loading-' + Date.now();
     container.innerHTML += `<div id="${loadingId}" class="bg-slate-900 border border-slate-800 p-3 rounded-xl rounded-tl-none mb-2 mr-10 text-sm text-slate-400"><i class="fa-solid fa-spinner fa-spin text-emerald-500"></i> Thinking...</div>`;
     container.scrollTop = container.scrollHeight;
@@ -162,15 +157,12 @@ window.askCoach = async function() {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ 
                 query, 
-                logs: state.logs, // Sends ALL logs (backend handles truncation if needed)
+                logs: state.logs, 
                 user: state.user 
             })
         });
         const data = await res.json();
-        
         document.getElementById(loadingId).remove();
-        
-        // AI Msg (Parsed Markdown)
         const htmlContent = marked.parse(data.answer);
         container.innerHTML += `<div class="bg-slate-900 border border-slate-800 p-3 rounded-xl rounded-tl-none mb-2 mr-2 text-sm text-slate-200 prose prose-invert max-w-none">${htmlContent}</div>`;
         container.scrollTop = container.scrollHeight;
@@ -180,31 +172,76 @@ window.askCoach = async function() {
     }
 };
 
-// --- MANUAL EDITING SETUP ---
+// --- MANUAL EDITING SETUP (Dynamic Inputs for Create & Edit) ---
 function renderManualInputs() {
-    const container = document.getElementById('manualMicrosContainer');
-    container.innerHTML = '';
-    
-    // We already have main macros and breakdown fields in HTML. 
-    // Just add Vitamins/Minerals here to save space
-    const vitMins = [...MICRO_GROUPS['Vitamins'], ...MICRO_GROUPS['Minerals']];
-    
-    vitMins.forEach(k => {
-        container.innerHTML += `
-            <div>
-                <label class="text-[9px] text-slate-500 capitalize">${k.replace(/_/g, ' ')}</label>
-                <input id="ov_${k}" class="input-dark text-sm" type="number">
-            </div>
-        `;
-    });
+    // 1. Populate Edit Modal (All Micros)
+    const editContainer = document.getElementById('manualMicrosContainer');
+    if (editContainer) {
+        editContainer.innerHTML = '';
+        const vitMins = [...MICRO_GROUPS['Vitamins'], ...MICRO_GROUPS['Minerals']];
+        vitMins.forEach(k => {
+            editContainer.innerHTML += `
+                <div>
+                    <label class="text-[9px] text-slate-500 capitalize">${k.replace(/_/g, ' ')}</label>
+                    <input id="ov_${k}" class="input-dark text-sm" type="number">
+                </div>
+            `;
+        });
+    }
+
+    // 2. Populate Create Tab (All Micros)
+    const createContainer = document.getElementById('createMicrosContainer');
+    if (createContainer) {
+        createContainer.innerHTML = '';
+        ALL_MICROS.forEach(k => {
+             createContainer.innerHTML += `
+                <div>
+                    <label class="text-[9px] text-slate-500 capitalize">${k.replace(/_/g, ' ')}</label>
+                    <input id="man_${k}" class="input-dark text-sm" type="number">
+                </div>
+            `;
+        });
+    }
 }
+
+// --- FIX: RESTORED Create Manual Item Function ---
+window.saveManualItem = function() {
+    const name = document.getElementById('manName').value;
+    if(!name) return alert("Name required");
+
+    const qty = parseFloat(document.getElementById('manQty').value) || 100;
+    const unit = document.getElementById('manUnit').value || 'g';
+
+    const getVal = (id) => parseFloat(document.getElementById(id).value) || 0;
+
+    const factor = (unit === 'g' || unit === 'ml') ? qty / 100 : qty; 
+
+    // Calculate base values (per 100g/unit)
+    const baseCal = getVal('manKcal') / factor;
+    const baseP = getVal('manProt') / factor;
+    const baseC = getVal('manCarb') / factor;
+    const baseF = getVal('manFat') / factor;
+
+    const micros = {};
+    ALL_MICROS.forEach(key => {
+        micros[key] = getVal(`man_${key}`) / factor;
+    });
+
+    const item = {
+        name, qty, unit,
+        baseCalories: baseCal, baseProtein: baseP, baseCarbs: baseC, baseFat: baseF,
+        micros, source: 'Manual'
+    };
+
+    prepFoodForEdit(item, true);
+};
+
 
 // --- EDIT LOGIC ---
 window.editExistingLog = function(id) {
     const log = state.logs.find(l => l.id === id);
     if(log) {
         if(!log.baseCalories) {
-            // Retrofit old logs
             const factor = (log.unit === 'g' || log.unit === 'ml') ? (log.qty / 100) : log.qty;
             log.baseCalories = log.calories / factor;
             log.baseProtein = log.protein / factor;
@@ -217,7 +254,6 @@ window.editExistingLog = function(id) {
 
 function prepFoodForEdit(item, isNew) {
     stopScanner();
-    
     const factor = item.base_qty ? (item.base_qty === 100 && (item.unit === 'g'|| item.unit==='ml') ? 1 : item.base_qty) : 1;
 
     state.tempFood = {
@@ -227,7 +263,7 @@ function prepFoodForEdit(item, isNew) {
         baseProtein: item.baseProtein || (item.protein / factor),
         baseCarbs: item.baseCarbs || (item.carbs / factor),
         baseFat: item.baseFat || (item.fat / factor),
-        micros: item.micros || {} // Ensure micros object exists
+        micros: item.micros || {} // FIX: Safe Access
     };
 
     const isFav = state.favorites.some(f => f.name === state.tempFood.name);
@@ -239,7 +275,7 @@ function prepFoodForEdit(item, isNew) {
     document.getElementById('btnDeleteLog').classList.toggle('hidden', isNew);
 
     document.getElementById('advancedEditToggle').checked = false;
-    toggleAdvancedEdit(); // Reset view
+    toggleAdvancedEdit();
 
     openEditModal();
 }
@@ -266,22 +302,21 @@ function toggleAdvancedEdit() {
         displayDiv.classList.add('hidden');
         manualDiv.classList.remove('hidden');
         
-        // Pre-fill manual inputs with current calculated values
         const qty = parseFloat(document.getElementById('editQty').value) || 0;
         const unit = document.getElementById('editUnit').value;
         const factor = (unit === 'g' || unit === 'ml') ? qty / 100 : qty;
 
-        // Macros
         document.getElementById('ov_kcal').value = Math.round(state.tempFood.baseCalories * factor);
         document.getElementById('ov_protein').value = Math.round(state.tempFood.baseProtein * factor);
         document.getElementById('ov_carbs').value = Math.round(state.tempFood.baseCarbs * factor);
         document.getElementById('ov_fat').value = Math.round(state.tempFood.baseFat * factor);
 
-        // All Micros
+        // FIX: Safe Access to micros
+        const safeMicros = state.tempFood.micros || {};
         ALL_MICROS.forEach(k => {
              const el = document.getElementById(`ov_${k}`);
              if(el) {
-                 const baseVal = state.tempFood.micros[k] || 0;
+                 const baseVal = safeMicros[k] || 0;
                  el.value = parseFloat((baseVal * factor).toFixed(2));
              }
         });
@@ -297,23 +332,22 @@ function updateEditPreview() {
     const unit = document.getElementById('editUnit').value;
     const factor = (unit === 'g' || unit === 'ml') ? qty / 100 : qty;
 
-    // Update Read-only Display
     document.getElementById('editKcal').innerText = Math.round(state.tempFood.baseCalories * factor);
     document.getElementById('editProt').innerText = Math.round(state.tempFood.baseProtein * factor);
     document.getElementById('editCarbs').innerText = Math.round(state.tempFood.baseCarbs * factor);
     document.getElementById('editFat').innerText = Math.round(state.tempFood.baseFat * factor);
     
-    // Update Manual Inputs if open
     if(document.getElementById('advancedEditToggle').checked) {
          document.getElementById('ov_kcal').value = Math.round(state.tempFood.baseCalories * factor);
          document.getElementById('ov_protein').value = Math.round(state.tempFood.baseProtein * factor);
          document.getElementById('ov_carbs').value = Math.round(state.tempFood.baseCarbs * factor);
          document.getElementById('ov_fat').value = Math.round(state.tempFood.baseFat * factor);
          
+         const safeMicros = state.tempFood.micros || {};
          ALL_MICROS.forEach(k => {
              const el = document.getElementById(`ov_${k}`);
              if(el) {
-                 const baseVal = state.tempFood.micros[k] || 0;
+                 const baseVal = safeMicros[k] || 0;
                  el.value = parseFloat((baseVal * factor).toFixed(2));
              }
          });
@@ -327,10 +361,9 @@ window.saveLog = function() {
     const isAdvanced = document.getElementById('advancedEditToggle').checked;
     
     let calories, protein, carbs, fat;
-    let finalMicros = { ...state.tempFood.micros };
+    let finalMicros = { ...(state.tempFood.micros || {}) };
 
     if (isAdvanced) {
-        // Capture Overrides
         calories = parseFloat(document.getElementById('ov_kcal').value) || 0;
         protein = parseFloat(document.getElementById('ov_protein').value) || 0;
         carbs = parseFloat(document.getElementById('ov_carbs').value) || 0;
@@ -338,12 +371,8 @@ window.saveLog = function() {
         
         ALL_MICROS.forEach(k => {
             const val = parseFloat(document.getElementById(`ov_${k}`).value) || 0;
-            finalMicros[k] = val; // Store exact value, assume user calculated it for this qty
+            finalMicros[k] = val; 
         });
-        
-        // Important: If manual override is used, we lose the "Base per 100g" logic for future resizes of THIS log entry
-        // unless we reverse calculate. For simplicity, we save as is.
-
     } else {
         const factor = (unit === 'g' || unit === 'ml') ? qty / 100 : qty;
         calories = state.tempFood.baseCalories * factor;
@@ -351,9 +380,8 @@ window.saveLog = function() {
         carbs = state.tempFood.baseCarbs * factor;
         fat = state.tempFood.baseFat * factor;
         
-        // Scale Micros
-        Object.keys(state.tempFood.micros).forEach(k => {
-            finalMicros[k] = state.tempFood.micros[k] * factor;
+        Object.keys(finalMicros).forEach(k => {
+            finalMicros[k] = (state.tempFood.micros[k] || 0) * factor;
         });
     }
     
@@ -366,7 +394,7 @@ window.saveLog = function() {
         qty, unit,
         calories, protein, carbs, fat,
         micros: finalMicros,
-        baseCalories: state.tempFood.baseCalories, // Keep base for reference
+        baseCalories: state.tempFood.baseCalories,
         baseProtein: state.tempFood.baseProtein,
         baseCarbs: state.tempFood.baseCarbs,
         baseFat: state.tempFood.baseFat
@@ -385,7 +413,6 @@ window.saveLog = function() {
     init();
 };
 
-// --- MICROS DISPLAY (Grouped) ---
 window.openMicros = function() {
     const dayLogs = state.logs.filter(l => l.date === state.currentDate);
     const totals = {};
@@ -408,7 +435,7 @@ window.openMicros = function() {
         
         MICRO_GROUPS[groupName].forEach(key => {
             const val = totals[key] || 0;
-            if (val > 0.1 || groupName === 'Breakdown') { // Hide negligible zeroes unless important
+            if (val > 0.1 || groupName === 'Breakdown') { 
                 html += `
                     <div class="flex justify-between items-center text-sm">
                         <span class="text-slate-400 capitalize">${key.replace(/_/g, ' ')}</span>
@@ -424,7 +451,45 @@ window.openMicros = function() {
     document.getElementById('microsModal').classList.remove('hidden');
 };
 
-// --- BOILERPLATE UTILS ---
+// --- FIX: EXPORT JSON (Re-implemented) ---
+window.exportJSON = () => {
+    const today = new Date();
+    const pastDate = new Date();
+    pastDate.setDate(today.getDate() - 30); 
+
+    const recentLogs = state.logs.filter(l => new Date(l.date) >= pastDate);
+
+    const exportData = recentLogs.map((l, index) => {
+        const item = {
+            date: l.timestamp || l.date, 
+            name: l.name,
+            calories: Math.round(l.calories),
+            protein: Math.round(l.protein * 10) / 10,
+            carbs: Math.round(l.carbs * 10) / 10,
+            fat: Math.round(l.fat * 10) / 10
+        };
+        
+        // FIX: Use ALL_MICROS constant
+        const micros = l.micros || {};
+        ALL_MICROS.forEach(key => {
+            if (micros[key]) {
+                item[key] = Math.round(micros[key] * 100) / 100;
+            }
+        });
+
+        return item;
+    });
+
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ logs: exportData }));
+    const link = document.createElement("a");
+    link.setAttribute("href", dataStr);
+    link.setAttribute("download", `foodlog_sync.json`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+};
+
+// Boilerplate
 window.closeEditModal = () => document.getElementById('editModal').classList.add('hidden');
 window.closeAddModal = () => document.getElementById('addModal').classList.add('translate-y-full');
 window.openAddModal = (meal) => {
@@ -447,9 +512,9 @@ window.setSearchMode = (mode) => {
     });
 };
 
-window.handleManualBarcode = () => { /* Logic similar to prev version */ };
+window.handleManualBarcode = () => { /* Add logic if needed */ };
 window.triggerVision = () => { document.getElementById('visionGal').click(); };
-window.handleVision = () => { /* Logic same as prev */ };
-window.deleteLog = () => { /* Logic same as prev */ };
+window.handleVision = () => { /* Add logic if needed */ };
+window.deleteLog = () => { /* Add logic if needed */ };
 
 init();
