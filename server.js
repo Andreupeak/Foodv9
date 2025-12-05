@@ -228,5 +228,64 @@ app.post('/api/vision', upload.single('image'), async (req, res) => {
     }
 });
 
+// --- API: AI Coach ---
+app.post('/api/coach', async (req, res) => {
+    const { query, logs, user } = req.body;
+    
+    // Limit logs to last 30 days to save context, unless query implies otherwise
+    // We send raw logs so the AI can do the math
+    const recentLogs = logs.slice(-100); // Send last 100 items to be safe on tokens
+
+    try {
+        const completion = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [{
+                role: "system", 
+                content: `You are an expert Nutrition Coach. Analyze the user's food logs and profile to answer their question.
+                
+                You have access to:
+                1. User Profile (Goals, Weight, etc)
+                2. Food Logs (Date, Name, Calories, Macros, Micros)
+
+                INSTRUCTIONS:
+                - Answer the user's question directly and helpfully.
+                - Identify lacking nutrients or excesses if asked.
+                - If the user asks for a graph/chart, or if a visual comparison would be very helpful, provide graph data.
+                
+                RESPONSE FORMAT (Strict JSON):
+                {
+                    "answer": "Markdown formatted text answer...",
+                    "graphs": [
+                        {
+                            "type": "bar" | "line" | "pie" | "doughnut",
+                            "title": "Chart Title",
+                            "labels": ["Mon", "Tue"...],
+                            "datasets": [
+                                { "label": "Calories", "data": [2000, 1800...], "backgroundColor": "#10b981" }
+                            ]
+                        }
+                    ]
+                }
+                
+                Return 'graphs': [] if no graph is needed.
+                Use specific hex colors for consistency: Calories #10b981, Protein #ef4444, Carbs #3b82f6, Fat #eab308.
+                `
+            }, {
+                role: "user",
+                content: `User Profile: ${JSON.stringify(user)}.
+                Recent Logs: ${JSON.stringify(recentLogs)}.
+                
+                User Query: "${query}"`
+            }]
+        });
+
+        const content = completion.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
+        res.json(JSON.parse(content));
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
