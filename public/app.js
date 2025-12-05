@@ -34,6 +34,7 @@ function init() {
     renderMeals();
     renderDashboard();
     renderProfileValues();
+    setupEditListeners();
 }
 
 // --- RENDERERS ---
@@ -392,6 +393,9 @@ function prepFoodForEdit(item, isNew) {
 
     // Toggle Delete Button
     document.getElementById('btnDeleteLog').classList.toggle('hidden', isNew);
+    
+    // Hide micros by default
+    document.getElementById('editMicrosArea').classList.add('hidden');
 
     openEditModal();
 }
@@ -409,18 +413,72 @@ document.getElementById('editQty').addEventListener('input', updateEditPreview);
 document.getElementById('editUnit').addEventListener('change', updateEditPreview);
 
 function updateEditPreview() {
+    // Update logic primarily updates the INPUT fields based on Qty
     const qty = parseFloat(document.getElementById('editQty').value) || 0;
     const unit = document.getElementById('editUnit').value;
     const factor = (unit === 'g' || unit === 'ml') ? qty / 100 : qty;
 
-    document.getElementById('editKcal').innerText = Math.round(state.tempFood.baseCalories * factor);
-    document.getElementById('editProt').innerText = Math.round(state.tempFood.baseProtein * factor);
-    document.getElementById('editCarbs').innerText = Math.round(state.tempFood.baseCarbs * factor);
-    document.getElementById('editFat').innerText = Math.round(state.tempFood.baseFat * factor);
+    // We only update the inputs if the active element is NOT the input itself
+    // to prevent cursor jumping or fighting user input if they are manually editing totals
+    const activeId = document.activeElement.id;
+
+    if (!['editKcal','editProt','editCarbs','editFat'].includes(activeId)) {
+        document.getElementById('editKcal').value = Math.round(state.tempFood.baseCalories * factor);
+        document.getElementById('editProt').value = Math.round(state.tempFood.baseProtein * factor * 10)/10;
+        document.getElementById('editCarbs').value = Math.round(state.tempFood.baseCarbs * factor * 10)/10;
+        document.getElementById('editFat').value = Math.round(state.tempFood.baseFat * factor * 10)/10;
+    }
+
+    // Update Micros
+    MICRO_KEYS.forEach(key => {
+        if(activeId !== `edit_${key}`) {
+            const val = (state.tempFood.micros[key] || 0) * factor;
+            document.getElementById(`edit_${key}`).value = val > 0 ? (Math.round(val * 100) / 100) : '';
+        }
+    });
+}
+
+function setupEditListeners() {
+    // When a user manually types a value in a Macro/Micro input, we REVERSE calculate the base
+    // so that if they change Qty later, the math holds up.
+    
+    const updateBase = (key, val) => {
+        const qty = parseFloat(document.getElementById('editQty').value) || 0;
+        const unit = document.getElementById('editUnit').value;
+        const factor = (unit === 'g' || unit === 'ml') ? qty / 100 : qty;
+        if(factor === 0) return;
+        
+        state.tempFood[key] = parseFloat(val) / factor;
+    };
+
+    const updateMicroBase = (key, val) => {
+        const qty = parseFloat(document.getElementById('editQty').value) || 0;
+        const unit = document.getElementById('editUnit').value;
+        const factor = (unit === 'g' || unit === 'ml') ? qty / 100 : qty;
+        if(factor === 0) return;
+
+        if(!state.tempFood.micros) state.tempFood.micros = {};
+        state.tempFood.micros[key] = parseFloat(val) / factor;
+    };
+
+    document.getElementById('editKcal').addEventListener('input', (e) => updateBase('baseCalories', e.target.value));
+    document.getElementById('editProt').addEventListener('input', (e) => updateBase('baseProtein', e.target.value));
+    document.getElementById('editCarbs').addEventListener('input', (e) => updateBase('baseCarbs', e.target.value));
+    document.getElementById('editFat').addEventListener('input', (e) => updateBase('baseFat', e.target.value));
+
+    MICRO_KEYS.forEach(key => {
+        const el = document.getElementById(`edit_${key}`);
+        if(el) {
+            el.addEventListener('input', (e) => updateMicroBase(key, e.target.value));
+        }
+    });
 }
 
 
 window.saveLog = function() {
+    // We read directly from current tempFood state (which is updated by listeners)
+    // OR we read from inputs. Reading inputs is safer for "what you see is what you get".
+    
     const qty = parseFloat(document.getElementById('editQty').value);
     const unit = document.getElementById('editUnit').value;
     const meal = document.getElementById('editMeal').value;
@@ -440,6 +498,24 @@ window.saveLog = function() {
         now.setMilliseconds(now.getMilliseconds() + Math.floor(Math.random() * 999));
         logTimestamp = now.toISOString();
     }
+    
+    // Read Current Input Values for accuracy
+    const currentKcal = parseFloat(document.getElementById('editKcal').value) || 0;
+    const currentProt = parseFloat(document.getElementById('editProt').value) || 0;
+    const currentCarb = parseFloat(document.getElementById('editCarbs').value) || 0;
+    const currentFat = parseFloat(document.getElementById('editFat').value) || 0;
+
+    // Update Micros from Input
+    const currentMicros = {};
+    MICRO_KEYS.forEach(key => {
+        const val = parseFloat(document.getElementById(`edit_${key}`).value);
+        if(!isNaN(val)) currentMicros[key] = val;
+    });
+
+    // Recalculate Base Values based on final inputs to ensure consistency
+    // This handles cases where user edited total but maybe listeners didn't catch 
+    // or to ensure perfect sync.
+    const safeFactor = factor === 0 ? 1 : factor;
 
     const log = {
         id: state.tempFood.isNew ? Math.random().toString(36).substr(2, 9) : state.tempFood.id,
@@ -448,15 +524,15 @@ window.saveLog = function() {
         meal: meal,
         name: state.tempFood.name,
         qty, unit,
-        calories: state.tempFood.baseCalories * factor,
-        protein: state.tempFood.baseProtein * factor,
-        carbs: state.tempFood.baseCarbs * factor,
-        fat: state.tempFood.baseFat * factor,
-        micros: state.tempFood.micros, 
-        baseCalories: state.tempFood.baseCalories,
-        baseProtein: state.tempFood.baseProtein,
-        baseCarbs: state.tempFood.baseCarbs,
-        baseFat: state.tempFood.baseFat
+        calories: currentKcal,
+        protein: currentProt,
+        carbs: currentCarb,
+        fat: currentFat,
+        micros: currentMicros,
+        baseCalories: currentKcal / safeFactor,
+        baseProtein: currentProt / safeFactor,
+        baseCarbs: currentCarb / safeFactor,
+        baseFat: currentFat / safeFactor
     };
 
     if (state.tempFood.isNew) {
