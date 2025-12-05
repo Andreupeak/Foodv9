@@ -213,7 +213,7 @@ app.post('/api/vision', upload.single('image'), async (req, res) => {
                 role: 'user',
                 content: [
                     { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } },
-                    { type: 'text', text: 'Identify food & estimate portion. Return JSON: { "name":Str, "estimated_weight_g":Num, "calories":Num, "protein":Num, "carbs":Num, "fat":Num, "micros": { "sugars":Num, "fiber":Num, "saturated_fat":Num, "sodium":Num, "calcium":Num, "iron":Num, "vitamin_c":Num } }. Values for WHOLE portion.' }
+                    { type: 'text', text: 'Identify food & estimate portion. Return JSON: { "name":Str, "estimated_weight_g":Num, "calories":Num, "protein":Num, "carbs":Num, "fat":Num, "micros": { "sugars":Num, "fiber":Num, "saturated_fat":Num, "monounsaturated_fat":Num, "polyunsaturated_fat":Num, "sodium":Num, "potassium":Num, "chloride":Num, "caffeine":Num, "water":Num, "vitamin_a":Num, "vitamin_c":Num, "calcium":Num, "iron":Num } }. Values for WHOLE portion.' }
                 ]
             }],
             max_tokens: 500
