@@ -77,19 +77,20 @@ function extractMicros(n) {
 app.post('/api/search', async (req, res) => {
     const { query, mode } = req.body;
 
-    // 1. OPEN FOOD FACTS (Optimized for Germany/Speed)
+    // 1. OPEN FOOD FACTS (Optimized for Speed)
     try {
         let url;
-        // Include new fields in the request
         const fields = 'product_name,product_name_de,brands,nutriments,code,_id';
         
         if (mode === 'barcode') {
             url = `https://world.openfoodfacts.org/api/v2/product/${query}.json?fields=${fields}`;
         } else {
-            url = `https://de.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=10&fields=${fields}`;
+            // OPTIMIZATION: sort_by=unique_scans_n (Popularity) + page_size=6
+            // This hits cached "hot" items first and reduces payload size
+            url = `https://de.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=6&sort_by=unique_scans_n&fields=${fields}`;
         }
 
-        const response = await axios.get(url, { timeout: 8000 });
+        const response = await axios.get(url, { timeout: 5000 });
         let products = [];
 
         if (mode === 'barcode' && (response.data.status === 1 || response.data.product)) {
@@ -114,7 +115,7 @@ app.post('/api/search', async (req, res) => {
             return res.json(results);
         }
     } catch (e) {
-        console.log(`OFF Error (${e.message}), falling back to AI...`);
+        console.log(`OFF Error/Timeout (${e.message}), falling back to AI...`);
     }
 
     if (mode === 'barcode') {
@@ -232,9 +233,8 @@ app.post('/api/vision', upload.single('image'), async (req, res) => {
 app.post('/api/coach', async (req, res) => {
     const { query, logs, user } = req.body;
     
-    // Limit logs to last 30 days to save context, unless query implies otherwise
-    // We send raw logs so the AI can do the math
-    const recentLogs = logs.slice(-100); // Send last 100 items to be safe on tokens
+    // Limit logs to last 100
+    const recentLogs = logs.slice(-100); 
 
     try {
         const completion = await openai.chat.completions.create({
