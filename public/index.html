@@ -42,9 +42,7 @@
         <!-- DASHBOARD VIEW -->
         <div id="view-dashboard">
             <div class="bg-slate-900 rounded-2xl p-5 mb-5 border border-slate-800 relative">
-                <button onclick="openMicros()" class="absolute top-4 right-4 text-xs text-emerald-400 bg-emerald-950 px-2 py-1 rounded border border-emerald-900">
-                    <i class="fa-solid fa-vial"></i> Details
-                </button>
+                <!-- Button moved from here to inside the flex container below -->
 
                 <div class="flex items-center">
                     <div class="relative w-28 h-28 rounded-full conic-gradient flex items-center justify-center shadow-2xl shadow-emerald-900/20" id="calCircle" style="--color: #34d399; --percent: 0%;">
@@ -66,6 +64,13 @@
                         <div class="space-y-1">
                             <div class="flex justify-between text-xs text-slate-400"><span>Fat</span><span id="fatVal">0/0g</span></div>
                             <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden"><div id="fatBar" class="h-full bg-yellow-500 w-0 transition-all duration-500"></div></div>
+                        </div>
+                        
+                        <!-- New Location for Details Button -->
+                        <div class="flex justify-end pt-1">
+                            <button onclick="openMicros()" class="text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-950/30 border border-emerald-900/50 px-2 py-1 rounded hover:bg-emerald-900/50 transition flex items-center gap-1">
+                                <i class="fa-solid fa-vial"></i> Details
+                            </button>
                         </div>
                     </div>
                 </div>
