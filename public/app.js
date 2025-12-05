@@ -148,6 +148,12 @@ function renderMeals() {
 
 function renderDashboard() {
     const dayLogs = state.logs.filter(l => l.date === state.currentDate);
+    
+    // NEW: Calculate Total Cost
+    const totalCost = dayLogs.reduce((sum, log) => sum + (log.cost || 0), 0);
+    const costEl = document.getElementById('dailyCost');
+    if(costEl) costEl.innerText = totalCost.toFixed(2);
+
     const totals = dayLogs.reduce((acc, curr) => ({
         kcal: acc.kcal + (curr.calories || 0),
         p: acc.p + (curr.protein || 0),
@@ -436,7 +442,11 @@ function prepFoodForEdit(item, isNew) {
         baseProtein: item.baseProtein || (item.protein / factor),
         baseCarbs: item.baseCarbs || (item.carbs / factor),
         baseFat: item.baseFat || (item.fat / factor),
-        micros: item.micros || {}
+        micros: item.micros || {},
+        // NEW: Cost initialization
+        cost: item.cost || 0,
+        pkgPrice: item.pkgPrice || null,
+        pkgWeight: item.pkgWeight || null
     };
 
     const isFav = state.favorites.some(f => f.name === state.tempFood.name);
@@ -463,6 +473,12 @@ function openEditModal() {
     document.getElementById('editSource').innerText = state.tempFood.source || 'Database';
     document.getElementById('editQty').value = state.tempFood.qty || 100;
     document.getElementById('editUnit').value = state.tempFood.unit || 'g';
+    
+    // NEW: Set cost values
+    document.getElementById('editCost').value = state.tempFood.cost ? state.tempFood.cost.toFixed(2) : '';
+    document.getElementById('editPkgPrice').value = state.tempFood.pkgPrice || '';
+    document.getElementById('editPkgWeight').value = state.tempFood.pkgWeight || '';
+    
     updateEditPreview();
 }
 
@@ -470,12 +486,10 @@ document.getElementById('editQty').addEventListener('input', updateEditPreview);
 document.getElementById('editUnit').addEventListener('change', updateEditPreview);
 
 function updateEditPreview() {
-    // Update logic primarily updates the INPUT fields based on Qty
     const qty = parseFloat(document.getElementById('editQty').value) || 0;
     const unit = document.getElementById('editUnit').value;
     const factor = (unit === 'g' || unit === 'ml') ? qty / 100 : qty;
 
-    // We only update the inputs if the active element is NOT the input itself
     const activeId = document.activeElement.id;
 
     if (!['editKcal','editProt','editCarbs','editFat'].includes(activeId)) {
@@ -483,6 +497,19 @@ function updateEditPreview() {
         document.getElementById('editProt').value = Math.round(state.tempFood.baseProtein * factor * 10)/10;
         document.getElementById('editCarbs').value = Math.round(state.tempFood.baseCarbs * factor * 10)/10;
         document.getElementById('editFat').value = Math.round(state.tempFood.baseFat * factor * 10)/10;
+    }
+
+    // NEW: Hybrid Cost Calculation Logic
+    const pkgPrice = parseFloat(document.getElementById('editPkgPrice').value);
+    const pkgWeight = parseFloat(document.getElementById('editPkgWeight').value);
+
+    // Only auto-calculate if user is NOT manually typing in the final cost box
+    if (activeId !== 'editCost') {
+        if (pkgPrice && pkgWeight && pkgWeight > 0) {
+            // Bulk Calculation: (Price / Weight) * CurrentQty
+            const calculatedCost = (pkgPrice / pkgWeight) * qty;
+            document.getElementById('editCost').value = calculatedCost.toFixed(2);
+        }
     }
 
     // Update Micros
@@ -518,6 +545,12 @@ function setupEditListeners() {
     document.getElementById('editProt').addEventListener('input', (e) => updateBase('baseProtein', e.target.value));
     document.getElementById('editCarbs').addEventListener('input', (e) => updateBase('baseCarbs', e.target.value));
     document.getElementById('editFat').addEventListener('input', (e) => updateBase('baseFat', e.target.value));
+
+    // NEW: Cost Listeners
+    // If user types in Package Price or Weight -> Recalculate Total Cost
+    ['editPkgPrice', 'editPkgWeight'].forEach(id => {
+        document.getElementById(id).addEventListener('input', updateEditPreview);
+    });
 
     MICRO_KEYS.forEach(key => {
         const el = document.getElementById(`edit_${key}`);
@@ -555,6 +588,11 @@ window.saveLog = function() {
     const currentCarb = parseFloat(document.getElementById('editCarbs').value) || 0;
     const currentFat = parseFloat(document.getElementById('editFat').value) || 0;
 
+    // NEW: Read Cost Values
+    const currentCost = parseFloat(document.getElementById('editCost').value) || 0;
+    const pkgPrice = parseFloat(document.getElementById('editPkgPrice').value) || null;
+    const pkgWeight = parseFloat(document.getElementById('editPkgWeight').value) || null;
+
     // Update Micros from Input
     const currentMicros = {};
     MICRO_KEYS.forEach(key => {
@@ -579,7 +617,11 @@ window.saveLog = function() {
         baseCalories: currentKcal / safeFactor,
         baseProtein: currentProt / safeFactor,
         baseCarbs: currentCarb / safeFactor,
-        baseFat: currentFat / safeFactor
+        baseFat: currentFat / safeFactor,
+        // NEW: Save Cost Data
+        cost: currentCost,
+        pkgPrice: pkgPrice,
+        pkgWeight: pkgWeight
     };
 
     if (state.tempFood.isNew) {
