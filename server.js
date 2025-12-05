@@ -25,53 +25,70 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// --- HELPER: Extract Micros ---
+
+// --- HELPER: Extract Micros (With Unit Conversion) ---
 function extractMicros(n) {
     if (!n) return {};
-    return {
-        // --- Macro Details ---
-        sugars: n['sugars_100g'] || n['sugars_value'] || 0,
-        fiber: n['fiber_100g'] || n['fiber_value'] || 0,
-        saturated_fat: n['saturated-fat_100g'] || n['saturated-fat_value'] || 0,
-        monounsaturated_fat: n['monounsaturated-fat_100g'] || n['monounsaturated-fat_value'] || 0,
-        polyunsaturated_fat: n['polyunsaturated-fat_100g'] || n['polyunsaturated-fat_value'] || 0,
-        
-        // --- Minerals/Electrolytes ---
-        sodium: n['sodium_100g'] || n['sodium_value'] || 0,
-        potassium: n['potassium_100g'] || n['potassium_value'] || 0,
-        chloride: n['chloride_100g'] || n['chloride_value'] || 0,
-        calcium: n['calcium_100g'] || n['calcium_value'] || 0,
-        magnesium: n['magnesium_100g'] || n['magnesium_value'] || 0,
-        zinc: n['zinc_100g'] || n['zinc_value'] || 0,
-        phosphorus: n['phosphorus_100g'] || 0,
-        iron: n['iron_100g'] || n['iron_value'] || 0,
-        copper: n['copper_100g'] || 0,
-        manganese: n['manganese_100g'] || 0,
-        iodine: n['iodine_100g'] || 0,
-        selenium: n['selenium_100g'] || 0,
-        chromium: n['chromium_100g'] || 0,
-        molybdenum: n['molybdenum_100g'] || 0,
+    
+    // Helper to safely get value. OFF API returns nutrients in GRAMS (g).
+    // We must convert to mg (x1000) or µg (x1,000,000).
+    const get = (key) => n[key] || 0;
 
-        // --- Vitamins ---
-        vitamin_a: n['vitamin-a_100g'] || n['vitamin-a_value'] || 0,
-        thiamin: n['vitamin-b1_100g'] || n['thiamin_100g'] || 0,
-        riboflavin: n['vitamin-b2_100g'] || n['riboflavin_100g'] || 0,
-        vitamin_b6: n['vitamin-b6_100g'] || 0,
-        vitamin_b12: n['vitamin-b12_100g'] || 0,
-        biotin: n['biotin_100g'] || n['vitamin-b7_100g'] || 0,
-        folic_acid: n['folates_100g'] || n['folic-acid_100g'] || n['vitamin-b9_100g'] || 0,
-        niacin: n['vitamin-pp_100g'] || n['niacin_100g'] || 0,
-        pantothenic_acid: n['pantothenic-acid_100g'] || n['vitamin-b5_100g'] || 0,
-        vitamin_c: n['vitamin-c_100g'] || n['vitamin-c_value'] || 0,
-        vitamin_d: n['vitamin-d_100g'] || n['vitamin-d_value'] || 0,
-        vitamin_e: n['vitamin-e_100g'] || n['vitamin-e_value'] || 0,
-        vitamin_k: n['vitamin-k_100g'] || n['phylloquinone_100g'] || 0,
+    return {
+        // --- Macro Details (Keep in Grams) ---
+        sugars: get('sugars_100g') || get('sugars_value'),
+        fiber: get('fiber_100g') || get('fiber_value'),
+        saturated_fat: get('saturated-fat_100g') || get('saturated-fat_value'),
+        monounsaturated_fat: get('monounsaturated-fat_100g') || get('monounsaturated-fat_value'),
+        polyunsaturated_fat: get('polyunsaturated-fat_100g') || get('polyunsaturated-fat_value'),
+        
+        // --- Minerals/Electrolytes (Convert g -> mg) ---
+        // Target: Milligrams (mg)
+        sodium: (get('sodium_100g') || get('sodium_value')) * 1000,
+        potassium: (get('potassium_100g') || get('potassium_value')) * 1000,
+        chloride: (get('chloride_100g') || get('chloride_value')) * 1000,
+        calcium: (get('calcium_100g') || get('calcium_value')) * 1000,
+        magnesium: (get('magnesium_100g') || get('magnesium_value')) * 1000,
+        zinc: (get('zinc_100g') || get('zinc_value')) * 1000,
+        phosphorus: (get('phosphorus_100g') || 0) * 1000,
+        iron: (get('iron_100g') || get('iron_value')) * 1000,
+        copper: (get('copper_100g') || 0) * 1000,
+        manganese: (get('manganese_100g') || 0) * 1000,
+        
+        // --- Trace Minerals (Convert g -> µg) ---
+        // Target: Micrograms (µg)
+        iodine: (get('iodine_100g') || 0) * 1e6,
+        selenium: (get('selenium_100g') || 0) * 1e6,
+        chromium: (get('chromium_100g') || 0) * 1e6,
+        molybdenum: (get('molybdenum_100g') || 0) * 1e6,
+
+        // --- Vitamins (Convert g -> mg or µg) ---
+        // Target: Micrograms (µg)
+        vitamin_a: (get('vitamin-a_100g') || get('vitamin-a_value')) * 1e6,
+        vitamin_d: (get('vitamin-d_100g') || get('vitamin-d_value')) * 1e6,
+        vitamin_k: (get('vitamin-k_100g') || get('phylloquinone_100g')) * 1e6,
+        vitamin_b12: (get('vitamin-b12_100g') || 0) * 1e6,
+        biotin: (get('biotin_100g') || get('vitamin-b7_100g')) * 1e6,
+        folic_acid: (get('folates_100g') || get('folic-acid_100g') || get('vitamin-b9_100g')) * 1e6,
+
+        // Target: Milligrams (mg)
+        thiamin: (get('vitamin-b1_100g') || get('thiamin_100g')) * 1000,
+        riboflavin: (get('vitamin-b2_100g') || get('riboflavin_100g')) * 1000,
+        vitamin_b6: (get('vitamin-b6_100g') || 0) * 1000,
+        niacin: (get('vitamin-pp_100g') || get('niacin_100g')) * 1000,
+        pantothenic_acid: (get('pantothenic-acid_100g') || get('vitamin-b5_100g')) * 1000,
+        vitamin_c: (get('vitamin-c_100g') || get('vitamin-c_value')) * 1000,
+        vitamin_e: (get('vitamin-e_100g') || get('vitamin-e_value')) * 1000,
 
         // --- Other ---
-        caffeine: n['caffeine_100g'] || n['caffeine_value'] || 0,
-        water: n['water_100g'] || n['water_value'] || 0
+        // Caffeine is usually tracked in mg. OFF uses g.
+        caffeine: (get('caffeine_100g') || get('caffeine_value')) * 1000,
+        
+        // Water stays in grams
+        water: get('water_100g') || get('water_value')
     };
 }
+
 
 // --- API: Search ---
 app.post('/api/search', async (req, res) => {
