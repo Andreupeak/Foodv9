@@ -9,7 +9,8 @@ const state = {
     currentDate: new Date().toISOString().split('T')[0],
     selectedMeal: 'Breakfast',
     tempFood: null,
-    activeTab: 'search' 
+    activeTab: 'search',
+    mainView: 'diary' // 'diary' or 'coach'
 };
 
 const MEALS = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
@@ -36,6 +37,26 @@ function init() {
     renderProfileValues();
     setupEditListeners();
 }
+
+// --- NAVIGATION ---
+window.switchMainView = function(view) {
+    state.mainView = view;
+    
+    // UI Toggles
+    document.getElementById('view-dashboard').classList.toggle('hidden', view !== 'diary');
+    document.getElementById('view-coach').classList.toggle('hidden', view !== 'coach');
+    document.getElementById('view-coach').classList.toggle('flex', view === 'coach'); // Coach needs flex
+    
+    // Nav Active State
+    document.getElementById('nav-diary').classList.toggle('text-emerald-400', view === 'diary');
+    document.getElementById('nav-diary').classList.toggle('text-slate-500', view !== 'diary');
+    
+    document.getElementById('nav-coach').classList.toggle('text-emerald-400', view === 'coach');
+    document.getElementById('nav-coach').classList.toggle('text-slate-500', view !== 'coach');
+
+    // Add button visibility
+    document.getElementById('mainAddBtn').classList.toggle('hidden', view === 'coach');
+};
 
 // --- RENDERERS ---
 function renderDate() {
@@ -419,7 +440,6 @@ function updateEditPreview() {
     const factor = (unit === 'g' || unit === 'ml') ? qty / 100 : qty;
 
     // We only update the inputs if the active element is NOT the input itself
-    // to prevent cursor jumping or fighting user input if they are manually editing totals
     const activeId = document.activeElement.id;
 
     if (!['editKcal','editProt','editCarbs','editFat'].includes(activeId)) {
@@ -439,9 +459,6 @@ function updateEditPreview() {
 }
 
 function setupEditListeners() {
-    // When a user manually types a value in a Macro/Micro input, we REVERSE calculate the base
-    // so that if they change Qty later, the math holds up.
-    
     const updateBase = (key, val) => {
         const qty = parseFloat(document.getElementById('editQty').value) || 0;
         const unit = document.getElementById('editUnit').value;
@@ -476,9 +493,6 @@ function setupEditListeners() {
 
 
 window.saveLog = function() {
-    // We read directly from current tempFood state (which is updated by listeners)
-    // OR we read from inputs. Reading inputs is safer for "what you see is what you get".
-    
     const qty = parseFloat(document.getElementById('editQty').value);
     const unit = document.getElementById('editUnit').value;
     const meal = document.getElementById('editMeal').value;
@@ -512,9 +526,6 @@ window.saveLog = function() {
         if(!isNaN(val)) currentMicros[key] = val;
     });
 
-    // Recalculate Base Values based on final inputs to ensure consistency
-    // This handles cases where user edited total but maybe listeners didn't catch 
-    // or to ensure perfect sync.
     const safeFactor = factor === 0 ? 1 : factor;
 
     const log = {
@@ -645,8 +656,6 @@ window.openMicros = function() {
         html += `<div class="space-y-1">`;
         groups[groupName].forEach(key => {
             const val = totals[key] || 0;
-            // Simple check to hide zero values if preferred, but user might want to see them.
-            // Keeping them visible for now.
             html += `
                 <div class="flex justify-between items-center bg-slate-800 p-2 rounded-lg border border-slate-700">
                     <span class="text-slate-400 text-xs">${labels[key] || key}</span>
@@ -686,6 +695,113 @@ window.generateMealPlan = async function() {
         alert("Failed to generate plan");
     }
     document.getElementById('plannerInput').disabled = false;
+};
+
+// --- AI COACH ---
+window.askCoach = async function() {
+    const input = document.getElementById('coachInput');
+    const query = input.value;
+    if(!query) return;
+
+    input.value = '';
+    const chatArea = document.getElementById('coachChatArea');
+    
+    // Add User Message
+    chatArea.innerHTML += `
+        <div class="flex justify-end mb-4">
+            <div class="bg-emerald-600 text-white p-3 rounded-xl rounded-tr-none text-sm max-w-[80%]">
+                ${query}
+            </div>
+        </div>
+    `;
+    
+    // Add Loading Indicator
+    const loadId = Math.random().toString(36);
+    chatArea.innerHTML += `
+        <div id="${loadId}" class="flex justify-start mb-4">
+            <div class="bg-slate-800 text-slate-400 p-3 rounded-xl rounded-tl-none text-sm">
+                <i class="fa-solid fa-circle-notch fa-spin"></i> Thinking...
+            </div>
+        </div>
+    `;
+    chatArea.scrollTop = chatArea.scrollHeight;
+
+    try {
+        const res = await fetch('/api/coach', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ 
+                query, 
+                logs: state.logs, // Send raw logs (server limits to recent)
+                user: state.user 
+            })
+        });
+        const data = await res.json();
+        
+        // Remove Loader
+        document.getElementById(loadId).remove();
+
+        // Render Answer
+        let answerHtml = `
+            <div class="flex justify-start mb-4 w-full">
+                <div class="bg-slate-900 border border-slate-800 text-white p-4 rounded-xl rounded-tl-none text-sm w-full">
+                    <div class="prose prose-invert prose-sm mb-3">
+                        ${marked.parse(data.answer)}
+                    </div>
+        `;
+
+        if(data.graphs && data.graphs.length > 0) {
+            data.graphs.forEach((g, idx) => {
+                const canvasId = `chart-${Math.random().toString(36).substr(2)}`;
+                answerHtml += `
+                    <div class="mt-4 h-64 bg-slate-950 rounded-lg p-2">
+                        <canvas id="${canvasId}"></canvas>
+                    </div>
+                `;
+                // Defer chart creation
+                setTimeout(() => {
+                    new Chart(document.getElementById(canvasId), {
+                        type: g.type,
+                        data: {
+                            labels: g.labels,
+                            datasets: g.datasets
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { labels: { color: '#94a3b8' } },
+                                title: { display: true, text: g.title, color: '#e2e8f0' }
+                            },
+                            scales: {
+                                y: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' } },
+                                x: { ticks: { color: '#64748b' }, grid: { display: false } }
+                            }
+                        }
+                    });
+                }, 100);
+            });
+        }
+
+        answerHtml += `</div></div>`;
+        chatArea.innerHTML += answerHtml;
+
+    } catch (e) {
+        document.getElementById(loadId).innerHTML = "Error contacting coach.";
+    }
+    
+    chatArea.scrollTop = chatArea.scrollHeight;
+};
+
+// We need a simple markdown parser for the AI text, let's add a basic one or assume simple text
+// Since I cannot add libraries easily, I'll use a very simple custom formatter
+const marked = {
+    parse: (text) => {
+        return text
+            .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>') // Bold
+            .replace(/\n/g, '<br>') // Newlines
+            .replace(/- (.*?)(<br>|$)/g, '• $1$2'); // Bullets
+    }
 };
 
 
