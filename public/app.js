@@ -9,16 +9,25 @@ const state = {
     currentDate: new Date().toISOString().split('T')[0],
     selectedMeal: 'Breakfast',
     tempFood: null,
-    activeTab: 'search' 
+    activeTab: 'search',
+    charts: {} // Store chart instances
 };
 
 const MEALS = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
 
+// ADDED: New Nutrient Keys
 const MICRO_KEYS = [
+    // Macros/Minerals
+    'sugar', 'fiber', 'saturated_fat', 'monounsaturated_fat', 'polyunsaturated_fat',
+    'sodium', 'potassium', 'chloride', 'caffeine', 'water',
+    
+    // Vitamins
     'vitamin_a', 'thiamin', 'riboflavin', 'vitamin_b6', 'vitamin_b12',
     'biotin', 'folic_acid', 'niacin', 'pantothenic_acid', 'vitamin_c',
-    'vitamin_d', 'vitamin_e', 'vitamin_k', 'calcium', 'magnesium',
-    'zinc', 'chromium', 'molybdenum', 'iodine', 'selenium',
+    'vitamin_d', 'vitamin_e', 'vitamin_k', 
+    
+    // Minerals
+    'calcium', 'magnesium', 'zinc', 'chromium', 'molybdenum', 'iodine', 'selenium',
     'phosphorus', 'manganese', 'iron', 'copper'
 ];
 
@@ -109,6 +118,136 @@ function updateBar(type, val, max) {
     document.getElementById(`${type}Bar`).style.width = `${pct}%`;
 }
 
+// --- SWITCH VIEW (DIARY / STATS) ---
+window.switchView = function(viewName) {
+    document.getElementById('view-diary').classList.add('hidden');
+    document.getElementById('view-stats').classList.add('hidden');
+    
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.replace('text-emerald-400', 'text-slate-500'));
+    
+    if (viewName === 'diary') {
+        document.getElementById('view-diary').classList.remove('hidden');
+        document.querySelector('button[onclick="switchView(\'diary\')"]').classList.replace('text-slate-500', 'text-emerald-400');
+    } else if (viewName === 'stats') {
+        document.getElementById('view-stats').classList.remove('hidden');
+        document.querySelector('button[onclick="switchView(\'stats\')"]').classList.replace('text-slate-500', 'text-emerald-400');
+        renderHistory(7); // Default to 7 days
+    }
+};
+
+// --- STATS & CHARTS ---
+window.renderHistory = function(days) {
+    const ctxCal = document.getElementById('caloriesChart').getContext('2d');
+    const ctxMac = document.getElementById('macrosChart').getContext('2d');
+    
+    // Destroy old charts
+    if(state.charts.cal) state.charts.cal.destroy();
+    if(state.charts.mac) state.charts.mac.destroy();
+
+    // Generate Data
+    const labels = [];
+    const dataCal = [];
+    const dataProt = [];
+    const dataCarb = [];
+    const dataFat = [];
+
+    for (let i = days - 1; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toISOString().split('T')[0];
+        labels.push(dateStr.slice(5)); // MM-DD
+
+        const logs = state.logs.filter(l => l.date === dateStr);
+        const totals = logs.reduce((acc, curr) => ({
+            k: acc.k + (curr.calories || 0),
+            p: acc.p + (curr.protein || 0),
+            c: acc.c + (curr.carbs || 0),
+            f: acc.f + (curr.fat || 0)
+        }), {k:0, p:0, c:0, f:0});
+
+        dataCal.push(totals.k);
+        dataProt.push(totals.p);
+        dataCarb.push(totals.c);
+        dataFat.push(totals.f);
+    }
+
+    // Colors
+    const colorText = '#94a3b8';
+    
+    state.charts.cal = new Chart(ctxCal, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Calories',
+                data: dataCal,
+                borderColor: '#34d399',
+                backgroundColor: 'rgba(52, 211, 153, 0.1)',
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { grid: { color: '#334155' }, ticks: { color: colorText } },
+                x: { grid: { display: false }, ticks: { color: colorText } }
+            },
+            plugins: { legend: { display: false } }
+        }
+    });
+
+    state.charts.mac = new Chart(ctxMac, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                { label: 'Prot', data: dataProt, backgroundColor: '#ef4444' },
+                { label: 'Carbs', data: dataCarb, backgroundColor: '#3b82f6' },
+                { label: 'Fat', data: dataFat, backgroundColor: '#eab308' }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { stacked: true, grid: { color: '#334155' }, ticks: { color: colorText } },
+                x: { stacked: true, grid: { display: false }, ticks: { color: colorText } }
+            }
+        }
+    });
+};
+
+window.analyzeHistory = async function() {
+    const resDiv = document.getElementById('aiAnalysisResult');
+    resDiv.classList.remove('hidden');
+    resDiv.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-emerald-500"></i> AI Coach is analyzing your last 7 days...';
+
+    // Get last 7 days logs
+    const today = new Date();
+    const past = new Date();
+    past.setDate(today.getDate() - 7);
+    const recentLogs = state.logs.filter(l => new Date(l.date) >= past);
+
+    try {
+        const res = await fetch('/api/analyze-trends', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ logs: recentLogs, user: state.user })
+        });
+        const data = await res.json();
+        resDiv.innerHTML = `<h4 class="font-bold text-emerald-400 mb-2">Coach Report:</h4>${markedParse(data.analysis)}`;
+    } catch(e) {
+        resDiv.innerHTML = 'AI Analysis failed. Try again.';
+    }
+};
+
+function markedParse(text) {
+    // Simple bold parser
+    return text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+}
+
 // --- GOAL CALCULATOR & PROFILE ---
 function renderProfileValues() {
     ['Weight', 'Height', 'Age', 'Gender', 'Activity', 'Goal'].forEach(k => {
@@ -186,11 +325,7 @@ window.openAddModal = function(meal) {
 };
 
 window.setSearchMode = function(mode) {
-    // Stop scanner if leaving search tab
-    if (state.activeTab === 'search' && mode !== 'search') {
-        stopScanner();
-    }
-
+    if (state.activeTab === 'search' && mode !== 'search') stopScanner();
     state.activeTab = mode;
     const views = ['search', 'analyze', 'create', 'favs'];
     views.forEach(v => {
@@ -216,6 +351,27 @@ document.getElementById('searchInput').addEventListener('input', (e) => {
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => performSearch(e.target.value), 600);
 });
+
+// ADDED: Manual Barcode Handler
+window.handleManualBarcode = function() {
+    const code = document.getElementById('manualBarcodeInput').value;
+    if(code) {
+        // Trigger barcode search mode
+        document.getElementById('searchInput').value = code;
+        performSearch(code); // Calls existing logic, which will use AI fallback if API fails
+        
+        // Specifically call API with barcode mode to check DB first
+         fetch('/api/search', {
+             method: 'POST',
+             headers: {'Content-Type': 'application/json'},
+             body: JSON.stringify({ query: code, mode: 'barcode' })
+        }).then(r => r.json()).then(data => {
+            if(data.length > 0) {
+                prepFoodForEdit(data[0], true);
+            }
+        });
+    }
+};
 
 async function performSearch(query) {
     if(query.length < 2) return;
@@ -360,7 +516,6 @@ window.editExistingLog = function(id) {
 };
 
 function prepFoodForEdit(item, isNew) {
-    // Stop scanner if user selects a food
     stopScanner();
 
     const factor = item.base_qty ? (item.base_qty === 100 && (item.unit === 'g'|| item.unit==='ml') ? 1 : item.base_qty) : 1;
@@ -380,12 +535,14 @@ function prepFoodForEdit(item, isNew) {
     favBtn.innerHTML = isFav ? '<i class="fa-solid fa-heart text-red-500"></i>' : '<i class="fa-regular fa-heart"></i>';
     favBtn.onclick = () => toggleFavorite();
 
-    // Set Meal Dropdown
     const mealSelect = document.getElementById('editMeal');
     mealSelect.value = item.meal || state.selectedMeal;
 
-    // Toggle Delete Button
     document.getElementById('btnDeleteLog').classList.toggle('hidden', isNew);
+
+    // Reset Advanced Edit
+    document.getElementById('advancedEditToggle').checked = false;
+    toggleAdvancedEdit();
 
     openEditModal();
 }
@@ -402,6 +559,35 @@ function openEditModal() {
 document.getElementById('editQty').addEventListener('input', updateEditPreview);
 document.getElementById('editUnit').addEventListener('change', updateEditPreview);
 
+// ADDED: Advanced Edit Toggle Logic
+document.getElementById('advancedEditToggle').addEventListener('change', toggleAdvancedEdit);
+
+function toggleAdvancedEdit() {
+    const isAdvanced = document.getElementById('advancedEditToggle').checked;
+    const displayDiv = document.getElementById('displayMacros');
+    const manualDiv = document.getElementById('manualMacros');
+
+    if (isAdvanced) {
+        displayDiv.classList.add('hidden');
+        manualDiv.classList.remove('hidden');
+        manualDiv.classList.add('grid');
+        
+        // Fill manual inputs with current calculated values
+        const qty = parseFloat(document.getElementById('editQty').value) || 0;
+        const unit = document.getElementById('editUnit').value;
+        const factor = (unit === 'g' || unit === 'ml') ? qty / 100 : qty;
+
+        document.getElementById('overrideKcal').value = Math.round(state.tempFood.baseCalories * factor);
+        document.getElementById('overrideProt').value = Math.round(state.tempFood.baseProtein * factor);
+        document.getElementById('overrideCarbs').value = Math.round(state.tempFood.baseCarbs * factor);
+        document.getElementById('overrideFat').value = Math.round(state.tempFood.baseFat * factor);
+    } else {
+        displayDiv.classList.remove('hidden');
+        manualDiv.classList.add('hidden');
+        manualDiv.classList.remove('grid');
+    }
+}
+
 function updateEditPreview() {
     const qty = parseFloat(document.getElementById('editQty').value) || 0;
     const unit = document.getElementById('editUnit').value;
@@ -411,6 +597,14 @@ function updateEditPreview() {
     document.getElementById('editProt').innerText = Math.round(state.tempFood.baseProtein * factor);
     document.getElementById('editCarbs').innerText = Math.round(state.tempFood.baseCarbs * factor);
     document.getElementById('editFat').innerText = Math.round(state.tempFood.baseFat * factor);
+    
+    // Update manual inputs if visible
+    if(document.getElementById('advancedEditToggle').checked) {
+         document.getElementById('overrideKcal').value = Math.round(state.tempFood.baseCalories * factor);
+         document.getElementById('overrideProt').value = Math.round(state.tempFood.baseProtein * factor);
+         document.getElementById('overrideCarbs').value = Math.round(state.tempFood.baseCarbs * factor);
+         document.getElementById('overrideFat').value = Math.round(state.tempFood.baseFat * factor);
+    }
 }
 
 
@@ -418,27 +612,34 @@ window.saveLog = function() {
     const qty = parseFloat(document.getElementById('editQty').value);
     const unit = document.getElementById('editUnit').value;
     const meal = document.getElementById('editMeal').value;
-    const factor = (unit === 'g' || unit === 'ml') ? qty / 100 : qty;
+    const isAdvanced = document.getElementById('advancedEditToggle').checked;
+    
+    let calories, protein, carbs, fat;
+
+    // Use Manual Override if Advanced Edit is Checked
+    if (isAdvanced) {
+        calories = parseFloat(document.getElementById('overrideKcal').value) || 0;
+        protein = parseFloat(document.getElementById('overrideProt').value) || 0;
+        carbs = parseFloat(document.getElementById('overrideCarbs').value) || 0;
+        fat = parseFloat(document.getElementById('overrideFat').value) || 0;
+    } else {
+        const factor = (unit === 'g' || unit === 'ml') ? qty / 100 : qty;
+        calories = state.tempFood.baseCalories * factor;
+        protein = state.tempFood.baseProtein * factor;
+        carbs = state.tempFood.baseCarbs * factor;
+        fat = state.tempFood.baseFat * factor;
+    }
     
     state.selectedMeal = meal;
 
-    // --- TIMESTAMP FIX ---
-    // If state.currentDate is NOT today (user is logging for yesterday), we must construct
-    // a timestamp that reflects that date, otherwise Apple Health/Export sees it as today.
     let logTimestamp;
     const now = new Date();
-    
-    // Check if currentDate matches today's date string
     const todayStr = now.toISOString().split('T')[0];
     
     if (state.currentDate !== todayStr) {
-        // Construct timestamp: Selected Date + Current Time (to preserve order)
-        // Format: YYYY-MM-DDTHH:mm:ss.sssZ
         const timePart = now.toISOString().split('T')[1];
         logTimestamp = `${state.currentDate}T${timePart}`;
     } else {
-        // Just use standard "now" if logging for today
-        // Add random ms to prevent collision
         now.setMilliseconds(now.getMilliseconds() + Math.floor(Math.random() * 999));
         logTimestamp = now.toISOString();
     }
@@ -446,16 +647,12 @@ window.saveLog = function() {
     const log = {
         id: state.tempFood.isNew ? Math.random().toString(36).substr(2, 9) : state.tempFood.id,
         date: state.currentDate,
-        // Use existing timestamp if editing, otherwise use calculated one
         timestamp: (state.tempFood.isNew || !state.tempFood.timestamp) ? logTimestamp : state.tempFood.timestamp,
         meal: meal,
         name: state.tempFood.name,
         qty, unit,
-        calories: state.tempFood.baseCalories * factor,
-        protein: state.tempFood.baseProtein * factor,
-        carbs: state.tempFood.baseCarbs * factor,
-        fat: state.tempFood.baseFat * factor,
-        micros: state.tempFood.micros, 
+        calories, protein, carbs, fat,
+        micros: state.tempFood.micros, // Micros scale automatically with quantity if not overridden, logic could be expanded for full micro editing
         baseCalories: state.tempFood.baseCalories,
         baseProtein: state.tempFood.baseProtein,
         baseCarbs: state.tempFood.baseCarbs,
@@ -467,7 +664,6 @@ window.saveLog = function() {
     } else {
         const idx = state.logs.findIndex(l => l.id === log.id);
         if (idx !== -1) {
-            // Keep original timestamp to prevent duplicating edits in Health
             if (state.logs[idx].timestamp) log.timestamp = state.logs[idx].timestamp;
             state.logs[idx] = log;
         }
@@ -504,7 +700,6 @@ function toggleFavorite() {
         state.favorites.splice(existingIdx, 1);
         document.getElementById('addToFavBtn').innerHTML = '<i class="fa-regular fa-heart"></i>';
     } else {
-        // Save current edited state as favorite preference (including meal category)
         const meal = document.getElementById('editMeal').value;
         const favItem = { ...state.tempFood, meal }; 
         state.favorites.push(favItem);
@@ -546,14 +741,20 @@ window.openMicros = function() {
     });
 
     const rdi = {
+        // Updated RDIs
+        sugar: 50, fiber: 30, saturated_fat: 20, sodium: 2300, potassium: 3500,
         vitamin_a: 800, thiamin: 1.1, riboflavin: 1.4, vitamin_b6: 1.4, vitamin_b12: 2.5,
         biotin: 50, folic_acid: 200, niacin: 16, pantothenic_acid: 6, vitamin_c: 80,
         vitamin_d: 5, vitamin_e: 12, vitamin_k: 75, calcium: 800, magnesium: 375,
         zinc: 10, chromium: 40, molybdenum: 50, iodine: 150, selenium: 55,
-        phosphorus: 700, manganese: 2, iron: 14, copper: 1
+        phosphorus: 700, manganese: 2, iron: 14, copper: 1, water: 2500
     };
 
     const labels = {
+        sugar: 'Sugars (g)', fiber: 'Fiber (g)', saturated_fat: 'Sat. Fat (g)',
+        monounsaturated_fat: 'Mono Fat (g)', polyunsaturated_fat: 'Poly Fat (g)',
+        sodium: 'Sodium (mg)', potassium: 'Potassium (mg)', chloride: 'Chloride (mg)',
+        caffeine: 'Caffeine (mg)', water: 'Water (ml)',
         vitamin_a: 'Vit A (µg)', thiamin: 'B1 Thiamin (mg)', riboflavin: 'B2 Riboflavin (mg)',
         vitamin_b6: 'Vit B6 (mg)', vitamin_b12: 'Vit B12 (µg)', biotin: 'Biotin (µg)',
         folic_acid: 'Folic Acid (µg)', niacin: 'Niacin (mg)', pantothenic_acid: 'Pantothenic (mg)',
@@ -568,12 +769,19 @@ window.openMicros = function() {
         const val = micros[key] || 0;
         const target = rdi[key] || 1;
         const pct = Math.round((val / target) * 100);
+        
+        let colorClass = pct >= 100 ? 'text-emerald-400' : 'text-blue-400';
+        // Inverse logic for Sugar/Sodium/SatFat
+        if (['sugar', 'sodium', 'saturated_fat'].includes(key)) {
+            colorClass = pct >= 100 ? 'text-red-400' : 'text-emerald-400';
+        }
+
         return `
             <div class="flex justify-between items-center bg-slate-800 p-2 rounded-lg">
                 <span class="text-slate-400 text-xs">${labels[key] || key}</span>
                 <div class="text-right">
                     <div class="text-white font-bold text-sm">${Math.round(val * 10) / 10}</div>
-                    <div class="text-[10px] ${pct >= 100 ? 'text-emerald-400' : 'text-blue-400'}">${pct}%</div>
+                    <div class="text-[10px] ${colorClass}">${pct}%</div>
                 </div>
             </div>
         `;
@@ -621,63 +829,49 @@ window.startScanner = async function() {
         <div class="absolute bottom-2 left-0 right-0 text-center text-xs text-white bg-black/50 p-1">Align barcode in box</div>
     `;
 
-    // 1. Initialize Reader
     if (!codeReader) {
         codeReader = new ZXingBrowser.BrowserMultiFormatReader();
     }
 
     try {
-        // 2. Select Camera (Environment/Back Camera)
         const videoInputDevices = await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
         const selectedDeviceId = videoInputDevices.find(device => device.label.toLowerCase().includes('back'))?.deviceId 
                                 || videoInputDevices[0].deviceId;
 
-        // 3. Configure Hints (Optimize for 1D Barcodes)
         const hints = new Map();
         const formats = [
-            ZXing.BarcodeFormat.EAN_13, // Standard EU Food
-            ZXing.BarcodeFormat.EAN_8,  // Small EU Food
-            ZXing.BarcodeFormat.UPC_A,  // US Food
-            ZXing.BarcodeFormat.UPC_E,  // Small US Food
-            ZXing.BarcodeFormat.CODE_128 // Some logistics tags
+            ZXing.BarcodeFormat.EAN_13,
+            ZXing.BarcodeFormat.EAN_8,
+            ZXing.BarcodeFormat.UPC_A,
+            ZXing.BarcodeFormat.UPC_E,
+            ZXing.BarcodeFormat.CODE_128
         ];
         hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
-        hints.set(ZXing.DecodeHintType.TRY_HARDER, true); // Deep scan (essential for barcodes)
+        hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
 
-        // 4. Start Decoding with High Resolution Constraints
-        // We force 1280x720 (720p) or higher. 480p is too blurry for barcodes.
         const controls = await codeReader.decodeFromVideoDevice(
             selectedDeviceId, 
             'video', 
             (result, err, controls) => {
                 if (result) {
-                    // SUCCESS
                     handleScanSuccess(result.text, controls);
                 }
-                // Note: 'err' is thrown every frame no code is found. We ignore it.
             },
             {
                 hints: hints,
-                timeBetweenScansMillis: 200 // Prevent CPU overheating
+                timeBetweenScansMillis: 200
             }
         );
 
-        // Store controls to stop later
         window.activeScannerControls = controls;
 
-        // 5. Apply Focus Constraints (Critical for Barcodes)
-        // We try to access the active track and force autofocus
         const videoElement = document.getElementById('video');
         if (videoElement && videoElement.srcObject) {
             currentStream = videoElement.srcObject;
             const track = currentStream.getVideoTracks()[0];
             const capabilities = track.getCapabilities();
-            
-            // Check if device supports Focus Mode and apply it
             if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
                 await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
-            } else if (capabilities.focusMode && capabilities.focusMode.includes('macro')) {
-                 await track.applyConstraints({ advanced: [{ focusMode: 'macro' }] });
             }
         }
 
@@ -688,17 +882,12 @@ window.startScanner = async function() {
 };
 
 function handleScanSuccess(text, controls) {
-    // 1. Stop Scanner Immediately
     if(controls) controls.stop();
     stopScanner();
 
-   
-
-    // 3. Perform Search
     document.getElementById('searchInput').value = text;
     performSearch(text);
 
-    // 4. API Call
     fetch('/api/search', {
          method: 'POST',
          headers: {'Content-Type': 'application/json'},
@@ -713,19 +902,14 @@ function handleScanSuccess(text, controls) {
 }
 
 window.stopScanner = function() {
-    // Stop the ZXing controls
     if (window.activeScannerControls) {
         window.activeScannerControls.stop();
         window.activeScannerControls = null;
     }
-    
-    // Hard stop all video tracks (turns off camera light)
     if (currentStream) {
         currentStream.getTracks().forEach(track => track.stop());
         currentStream = null;
     }
-    
-    // Clear DOM
     const container = document.getElementById('scanner-container');
     if (container) {
         container.innerHTML = '';
@@ -809,24 +993,19 @@ window.exportJSON = () => {
     const exportData = recentLogs.map((l, index) => {
         const factor = (l.unit === 'g' || l.unit === 'ml') ? (l.qty / 100) : l.qty;
         
-        // 1. Create a Reliable Date Object
         let dateObj;
         if (l.timestamp) {
             dateObj = new Date(l.timestamp);
         } else {
-            // Fallback: Create noon timestamp for logs that miss it
             dateObj = new Date(l.date); 
             dateObj.setHours(12, 0, 0, 0); 
-            // Add seconds based on index to avoid exact duplicate times
             dateObj.setSeconds(index % 60); 
         }
 
-        // 2. EXPORT AS ISO STRING (Text)
-        // Shortcuts loves this format (e.g., "2023-12-05T12:00:00.000Z")
         const dateString = dateObj.toISOString();
 
         const item = {
-            date: dateString, // Sending TEXT now
+            date: dateString, 
             name: l.name,
             calories: Math.round(l.calories),
             protein: Math.round(l.protein * 10) / 10,
@@ -843,7 +1022,6 @@ window.exportJSON = () => {
         return item;
     });
 
-    // Wrap in object to satisfy Shortcuts "Get Dictionary" requirements
     const finalOutput = { "logs": exportData };
 
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(finalOutput));
