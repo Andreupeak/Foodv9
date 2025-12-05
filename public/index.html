@@ -112,7 +112,7 @@
                 <button onclick="startScanner()" class="absolute right-3 top-2.5 text-slate-400 bg-slate-700 p-1.5 rounded-lg"><i class="fa-solid fa-barcode"></i></button>
             </div>
 
-            <div class="grid grid-cols-2 gap-3 mb-4">
+            <div class="grid grid-cols-2 gap-3 mb-3">
                 <button onclick="triggerVision('camera')" class="py-3 bg-slate-800 rounded-xl border border-slate-700 text-slate-300 text-sm font-medium flex items-center justify-center gap-2">
                     <i class="fa-solid fa-camera text-emerald-400"></i> Camera Scan
                 </button>
@@ -120,6 +120,11 @@
                     <i class="fa-solid fa-image text-blue-400"></i> Upload Pic
                 </button>
             </div>
+            
+            <!-- Manual Barcode Button -->
+            <button onclick="manualBarcode()" class="w-full py-3 bg-slate-900 rounded-xl border border-slate-800 text-slate-400 text-sm font-medium flex items-center justify-center gap-2 hover:text-white hover:border-slate-600 transition mb-4">
+                <i class="fa-solid fa-keyboard"></i> Enter Barcode Manually
+            </button>
 
             <div id="searchResults" class="flex-1 overflow-y-auto space-y-2 pb-10">
                 <div class="text-center text-slate-600 mt-10 text-sm">
