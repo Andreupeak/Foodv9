@@ -1,520 +1,314 @@
-// --- STATE ---
+// --- CONFIG & LISTS ---
+const MEALS = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
+
+[cite_start]// Categorized Nutrient Keys for Loops [cite: 1]
+const NUTRIENT_GROUPS = {
+    details: ['sugar', 'fiber', 'saturated_fat', 'monounsaturated_fat', 'polyunsaturated_fat', 'sodium', 'potassium', 'chloride', 'caffeine', 'water'],
+    vitamins: ['vitamin_a', 'thiamin', 'riboflavin', 'vitamin_b6', 'vitamin_b12', 'biotin', 'folic_acid', 'niacin', 'pantothenic_acid', 'vitamin_c', 'vitamin_d', 'vitamin_e', 'vitamin_k'],
+    minerals: ['calcium', 'magnesium', 'zinc', 'chromium', 'molybdenum', 'iodine', 'selenium', 'phosphorus', 'manganese', 'iron', 'copper']
+};
+
+// Flattened list for calculations
+const ALL_NUTRIENTS = [...NUTRIENT_GROUPS.details, ...NUTRIENT_GROUPS.vitamins, ...NUTRIENT_GROUPS.minerals];
+
 const state = {
     logs: JSON.parse(localStorage.getItem('foodlog_logs')) || [],
-    user: JSON.parse(localStorage.getItem('foodlog_user')) || { 
-        weight: 70, height: 175, age: 30, gender: 'male', activity: 1.375, goal: 0,
-        kcal: 2000, p: 150, c: 250, f: 70 
-    },
+    user: JSON.parse(localStorage.getItem('foodlog_user')) || { kcal: 2000, p: 150, c: 250, f: 70 },
     favorites: JSON.parse(localStorage.getItem('foodlog_favs')) || [],
     currentDate: new Date().toISOString().split('T')[0],
     selectedMeal: 'Breakfast',
     tempFood: null,
     activeTab: 'search',
-    chatHistory: [] 
+    mainView: 'diary' // diary vs coach
 };
-
-const MEALS = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
-
-// --- NUTRIENT DEFINITIONS ---
-const MICRO_GROUPS = {
-    'Breakdown': ['sugar', 'fiber', 'saturated_fat', 'monounsaturated_fat', 'polyunsaturated_fat', 'trans_fat', 'cholesterol'],
-    'Electrolytes & Stimulants': ['sodium', 'potassium', 'caffeine', 'water'],
-    'Vitamins': ['vitamin_a', 'vitamin_c', 'vitamin_d', 'vitamin_e', 'vitamin_k', 'thiamin', 'riboflavin', 'niacin', 'vitamin_b6', 'folic_acid', 'vitamin_b12', 'biotin', 'pantothenic_acid'],
-    'Minerals': ['calcium', 'magnesium', 'iron', 'zinc', 'phosphorus', 'iodine', 'selenium', 'chloride', 'manganese', 'copper', 'chromium', 'molybdenum']
-};
-
-// FIX: Flatten keys for export and saving
-const ALL_MICROS = Object.values(MICRO_GROUPS).flat();
 
 // --- INIT ---
 function init() {
     renderDate();
     renderMeals();
     renderDashboard();
-    renderManualInputs(); 
+    // Pre-build Edit Modal Inputs
+    buildEditModalInputs();
 }
 
-// --- RENDERERS ---
-function renderDate() {
-    const d = new Date(state.currentDate);
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('currentDateDisplay').innerText = state.currentDate === today ? 'Today' : d.toDateString();
-}
-
-function renderMeals() {
-    const container = document.getElementById('mealsContainer');
-    container.innerHTML = '';
-    const dayLogs = state.logs.filter(l => l.date === state.currentDate);
-
-    MEALS.forEach(meal => {
-        const mealLogs = dayLogs.filter(l => l.meal === meal);
-        const mealCals = mealLogs.reduce((acc, curr) => acc + (curr.calories || 0), 0);
-
-        let html = `
-            <div class="bg-slate-900 rounded-2xl border border-slate-800 p-4">
-                <div class="flex justify-between items-center mb-3">
-                    <h3 class="font-bold text-slate-200">${meal}</h3>
-                    <span class="text-xs text-slate-500 font-mono">${Math.round(mealCals)} kcal</span>
-                </div>
-                <div class="space-y-3">
-        `;
-
-        if(mealLogs.length === 0) {
-            html += `<div class="text-xs text-slate-600 italic py-2">No food logged</div>`;
-        } else {
-            mealLogs.forEach(log => {
-                html += `
-                    <div onclick="editExistingLog('${log.id}')" class="flex justify-between items-center border-b border-slate-800 pb-2 last:border-0 cursor-pointer active:opacity-70">
-                        <div>
-                            <div class="font-medium text-slate-200 text-sm">${log.name}</div>
-                            <div class="text-[10px] text-slate-500">
-                                ${log.qty}${log.unit} 
-                                ${log.micros && log.micros.caffeine > 0 ? `<i class="fa-solid fa-mug-hot ml-1 text-yellow-600"></i>` : ''}
-                            </div>
-                        </div>
-                        <div class="text-xs text-emerald-500 font-medium">${Math.round(log.calories)}</div>
-                    </div>
-                `;
-            });
-        }
-
-        html += `
-                </div>
-                <button onclick="openAddModal('${meal}')" class="mt-3 w-full py-2.5 text-xs font-bold uppercase tracking-wider text-emerald-400 bg-emerald-950/30 border border-emerald-900/50 rounded-xl hover:bg-emerald-900/50 transition">
-                    + Add Food
-                </button>
-            </div>
-        `;
-        container.innerHTML += html;
+// --- NAVIGATION ---
+window.switchMainView = function(view) {
+    state.mainView = view;
+    if(view === 'diary') {
+        document.getElementById('main-view').classList.remove('hidden');
+        document.getElementById('view-coach').classList.add('hidden');
+    } else {
+        document.getElementById('main-view').classList.add('hidden');
+        document.getElementById('view-coach').classList.remove('hidden');
+        document.getElementById('view-coach').classList.add('flex');
+    }
+    // Update Nav Icons opacity/color
+    document.querySelectorAll('.nav-item').forEach(btn => {
+        if(btn.innerText.toLowerCase().includes(view)) btn.classList.add('text-emerald-400');
+        else btn.classList.remove('text-emerald-400');
     });
-}
+};
 
-function renderDashboard() {
-    const dayLogs = state.logs.filter(l => l.date === state.currentDate);
-    const totals = dayLogs.reduce((acc, curr) => ({
-        kcal: acc.kcal + (curr.calories || 0),
-        p: acc.p + (curr.protein || 0),
-        c: acc.c + (curr.carbs || 0),
-        f: acc.f + (curr.fat || 0)
-    }), { kcal: 0, p: 0, c: 0, f: 0 });
+// --- MANUAL BARCODE ---
+window.toggleManualBarcode = function() {
+    const el = document.getElementById('manualBarcodeInput');
+    el.classList.toggle('hidden');
+    if(!el.classList.contains('hidden')) document.getElementById('pasteBarcode').focus();
+};
 
-    const remaining = Math.round(state.user.kcal - totals.kcal);
-    const percent = Math.min((totals.kcal / state.user.kcal) * 100, 100);
-    
-    document.getElementById('calRemaining').innerText = remaining;
-    document.getElementById('calCircle').style.setProperty('--percent', `${percent}%`);
-    document.getElementById('calCircle').style.setProperty('--color', remaining < 0 ? '#ef4444' : '#34d399');
-
-    updateBar('carb', totals.c, state.user.c);
-    updateBar('prot', totals.p, state.user.p);
-    updateBar('fat', totals.f, state.user.f);
-}
-
-function updateBar(type, val, max) {
-    const pct = Math.min((val / max) * 100, 100);
-    document.getElementById(`${type}Val`).innerText = `${Math.round(val)}/${Math.round(max)}g`;
-    document.getElementById(`${type}Bar`).style.width = `${pct}%`;
-}
-
-// --- SWITCH VIEW ---
-window.switchView = function(viewName) {
-    document.getElementById('view-diary').classList.add('hidden');
-    document.getElementById('view-stats').classList.add('hidden');
-    
-    document.querySelectorAll('.nav-item').forEach(el => el.classList.replace('text-emerald-400', 'text-slate-500'));
-    
-    if (viewName === 'diary') {
-        document.getElementById('view-diary').classList.remove('hidden');
-        document.querySelector('button[onclick="switchView(\'diary\')"]').classList.replace('text-slate-500', 'text-emerald-400');
-    } else if (viewName === 'stats') {
-        document.getElementById('view-stats').classList.remove('hidden');
-        document.querySelector('button[onclick="switchView(\'stats\')"]').classList.replace('text-slate-500', 'text-emerald-400');
+window.searchManualBarcode = function() {
+    const code = document.getElementById('pasteBarcode').value;
+    if(code) {
+        document.getElementById('searchInput').value = code;
+        fetch('/api/search', {
+             method: 'POST',
+             headers: {'Content-Type': 'application/json'},
+             body: JSON.stringify({ query: code, mode: 'barcode' })
+        }).then(r => r.json()).then(data => {
+            if(data.length > 0) prepFoodForEdit(data[0], true);
+            else alert("Not found");
+        });
     }
 };
 
-// --- ASK AI COACH ---
-window.setCoachQuery = (txt) => {
-    document.getElementById('coachInput').value = txt;
-    askCoach();
-};
-
+[cite_start]// --- AI COACH [cite: 6] ---
 window.askCoach = async function() {
     const input = document.getElementById('coachInput');
-    const query = input.value.trim();
+    const query = input.value;
     if(!query) return;
 
-    const container = document.getElementById('coachChatContainer');
-    container.innerHTML += `<div class="bg-slate-800 p-3 rounded-xl rounded-tr-none mb-2 ml-10 text-right text-sm">${query}</div>`;
+    // Add user message to UI
+    const chat = document.getElementById('coachChat');
+    chat.innerHTML += `<div class="bg-emerald-900/30 p-3 rounded-xl rounded-tr-none border border-emerald-900 ml-auto max-w-[80%] text-sm text-white">${query}</div>`;
     input.value = '';
-    
-    const loadingId = 'loading-' + Date.now();
-    container.innerHTML += `<div id="${loadingId}" class="bg-slate-900 border border-slate-800 p-3 rounded-xl rounded-tl-none mb-2 mr-10 text-sm text-slate-400"><i class="fa-solid fa-spinner fa-spin text-emerald-500"></i> Thinking...</div>`;
-    container.scrollTop = container.scrollHeight;
+    chat.scrollTop = chat.scrollHeight;
 
-    try {
-        const res = await fetch('/api/ask-coach', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ 
-                query, 
-                logs: state.logs, 
-                user: state.user 
-            })
-        });
-        const data = await res.json();
-        document.getElementById(loadingId).remove();
-        const htmlContent = marked.parse(data.answer);
-        container.innerHTML += `<div class="bg-slate-900 border border-slate-800 p-3 rounded-xl rounded-tl-none mb-2 mr-2 text-sm text-slate-200 prose prose-invert max-w-none">${htmlContent}</div>`;
-        container.scrollTop = container.scrollHeight;
-
-    } catch(e) {
-        document.getElementById(loadingId).innerHTML = "Error contacting coach.";
-    }
-};
-
-// --- MANUAL EDITING SETUP (Dynamic Inputs for Create & Edit) ---
-function renderManualInputs() {
-    // 1. Populate Edit Modal (All Micros)
-    const editContainer = document.getElementById('manualMicrosContainer');
-    if (editContainer) {
-        editContainer.innerHTML = '';
-        const vitMins = [...MICRO_GROUPS['Vitamins'], ...MICRO_GROUPS['Minerals']];
-        vitMins.forEach(k => {
-            editContainer.innerHTML += `
-                <div>
-                    <label class="text-[9px] text-slate-500 capitalize">${k.replace(/_/g, ' ')}</label>
-                    <input id="ov_${k}" class="input-dark text-sm" type="number">
-                </div>
-            `;
-        });
-    }
-
-    // 2. Populate Create Tab (All Micros)
-    const createContainer = document.getElementById('createMicrosContainer');
-    if (createContainer) {
-        createContainer.innerHTML = '';
-        ALL_MICROS.forEach(k => {
-             createContainer.innerHTML += `
-                <div>
-                    <label class="text-[9px] text-slate-500 capitalize">${k.replace(/_/g, ' ')}</label>
-                    <input id="man_${k}" class="input-dark text-sm" type="number">
-                </div>
-            `;
-        });
-    }
-}
-
-// --- FIX: RESTORED Create Manual Item Function ---
-window.saveManualItem = function() {
-    const name = document.getElementById('manName').value;
-    if(!name) return alert("Name required");
-
-    const qty = parseFloat(document.getElementById('manQty').value) || 100;
-    const unit = document.getElementById('manUnit').value || 'g';
-
-    const getVal = (id) => parseFloat(document.getElementById(id).value) || 0;
-
-    const factor = (unit === 'g' || unit === 'ml') ? qty / 100 : qty; 
-
-    // Calculate base values (per 100g/unit)
-    const baseCal = getVal('manKcal') / factor;
-    const baseP = getVal('manProt') / factor;
-    const baseC = getVal('manCarb') / factor;
-    const baseF = getVal('manFat') / factor;
-
-    const micros = {};
-    ALL_MICROS.forEach(key => {
-        micros[key] = getVal(`man_${key}`) / factor;
+    // Get last 7 days history
+    const history = state.logs.filter(l => {
+        const d = new Date(l.date);
+        const now = new Date();
+        return (now - d) / (1000 * 60 * 60 * 24) < 7;
     });
 
-    const item = {
-        name, qty, unit,
-        baseCalories: baseCal, baseProtein: baseP, baseCarbs: baseC, baseFat: baseF,
-        micros, source: 'Manual'
-    };
-
-    prepFoodForEdit(item, true);
-};
-
-
-// --- EDIT LOGIC ---
-window.editExistingLog = function(id) {
-    const log = state.logs.find(l => l.id === id);
-    if(log) {
-        if(!log.baseCalories) {
-            const factor = (log.unit === 'g' || log.unit === 'ml') ? (log.qty / 100) : log.qty;
-            log.baseCalories = log.calories / factor;
-            log.baseProtein = log.protein / factor;
-            log.baseCarbs = log.carbs / factor;
-            log.baseFat = log.fat / factor;
-        }
-        prepFoodForEdit(log, false);
+    try {
+        chat.innerHTML += `<div id="coachLoading" class="text-xs text-slate-500 italic">Coach is thinking...</div>`;
+        const res = await fetch('/api/coach', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ history, query })
+        });
+        const data = await res.json();
+        
+        document.getElementById('coachLoading').remove();
+        // Simple formatter for markdown-like bolding
+        const fmt = data.text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+        
+        chat.innerHTML += `<div class="bg-slate-900 p-3 rounded-xl rounded-tl-none border border-slate-800 text-sm text-slate-300 mr-auto max-w-[90%]">${fmt}</div>`;
+        chat.scrollTop = chat.scrollHeight;
+    } catch(e) {
+        document.getElementById('coachLoading').innerHTML = "Error contacting coach.";
     }
 };
 
-function prepFoodForEdit(item, isNew) {
-    stopScanner();
-    const factor = item.base_qty ? (item.base_qty === 100 && (item.unit === 'g'|| item.unit==='ml') ? 1 : item.base_qty) : 1;
+[cite_start]// --- EXTENDED EDIT MODAL LOGIC [cite: 4] ---
+function buildEditModalInputs() {
+    // Dynamically build the inputs for vitamins/minerals so index.html isn't huge
+    const createInput = (key) => `
+        <div>
+            <label class="text-[10px] text-slate-500 capitalize">${key.replace(/_/g, ' ')}</label>
+            <input id="val_${key}" class="input-dark" type="number" placeholder="0">
+        </div>`;
+
+    document.getElementById('editVitaminsContainer').innerHTML = NUTRIENT_GROUPS.vitamins.map(createInput).join('');
+    document.getElementById('editMineralsContainer').innerHTML = NUTRIENT_GROUPS.minerals.map(createInput).join('');
+}
+
+window.prepFoodForEdit = function(item, isNew) {
+    if(window.stopScanner) window.stopScanner();
+
+    // Verification Logic: If it's a "Vision" source, the item comes with estimated_weight_g
+    // We treat this weight as the default Qty, but allow user to edit it.
+    let currentQty = item.qty || 100;
+    if(item.estimated_weight_g) currentQty = item.estimated_weight_g;
+
+    // Calculate base values (per 1 unit) to allow scaling
+    const factor = (item.unit === 'g' || item.unit === 'ml') ? (item.base_qty || 100) / 100 : 1;
+    // Note: If coming from search, item values are usually per 100g. 
+    // If coming from Vision, item values are for the WHOLE portion (estimated_weight_g).
+    
+    // Normalize to "Base per 1 unit (1g or 1 serving)" for the logic
+    let baseMult = 1;
+    if(item.source === 'AI Vision' || item.source === 'AI Estimate') {
+         // Vision/AI returns total values for the specific weight
+         baseMult = (item.unit === 'g' && currentQty > 0) ? 1/currentQty : 1; 
+    } else {
+         // Database returns per 100g usually
+         baseMult = 0.01; 
+    }
 
     state.tempFood = {
         ...item,
         isNew,
-        baseCalories: item.baseCalories || (item.calories / factor),
-        baseProtein: item.baseProtein || (item.protein / factor),
-        baseCarbs: item.baseCarbs || (item.carbs / factor),
-        baseFat: item.baseFat || (item.fat / factor),
-        micros: item.micros || {} // FIX: Safe Access
+        // Store base values (per 1g) for scaling
+        base: {
+            calories: item.calories * baseMult,
+            protein: item.protein * baseMult,
+            carbs: item.carbs * baseMult,
+            fat: item.fat * baseMult,
+            nutrients: {}
+        }
     };
 
-    const isFav = state.favorites.some(f => f.name === state.tempFood.name);
-    const favBtn = document.getElementById('addToFavBtn');
-    favBtn.innerHTML = isFav ? '<i class="fa-solid fa-heart text-red-500"></i>' : '<i class="fa-regular fa-heart"></i>';
-    favBtn.onclick = () => toggleFavorite();
+    // Flatten nutrients into base
+    const nuts = item.nutrients || {};
+    ALL_NUTRIENTS.forEach(k => {
+        state.tempFood.base.nutrients[k] = (nuts[k] || 0) * baseMult;
+    });
 
-    document.getElementById('editMeal').value = item.meal || state.selectedMeal;
-    document.getElementById('btnDeleteLog').classList.toggle('hidden', isNew);
+    openEditModal(currentQty);
+};
 
-    document.getElementById('advancedEditToggle').checked = false;
-    toggleAdvancedEdit();
+window.createEmptyLog = function() {
+    const emptyItem = {
+        name: "New Food", qty: 100, unit: 'g', source: 'Manual',
+        calories: 0, protein: 0, carbs: 0, fat: 0, nutrients: {}
+    };
+    prepFoodForEdit(emptyItem, true);
+};
 
-    openEditModal();
-}
-
-function openEditModal() {
+function openEditModal(qtyOverride) {
+    const f = state.tempFood;
     document.getElementById('editModal').classList.remove('hidden');
-    document.getElementById('editName').innerText = state.tempFood.name;
-    document.getElementById('editSource').innerText = state.tempFood.source || 'Database';
-    document.getElementById('editQty').value = state.tempFood.qty || 100;
-    document.getElementById('editUnit').value = state.tempFood.unit || 'g';
-    updateEditPreview();
-}
-
-document.getElementById('editQty').addEventListener('input', updateEditPreview);
-document.getElementById('editUnit').addEventListener('change', updateEditPreview);
-document.getElementById('advancedEditToggle').addEventListener('change', toggleAdvancedEdit);
-
-function toggleAdvancedEdit() {
-    const isAdvanced = document.getElementById('advancedEditToggle').checked;
-    const displayDiv = document.getElementById('displayMacros');
-    const manualDiv = document.getElementById('manualMacros');
-
-    if (isAdvanced) {
-        displayDiv.classList.add('hidden');
-        manualDiv.classList.remove('hidden');
-        
-        const qty = parseFloat(document.getElementById('editQty').value) || 0;
-        const unit = document.getElementById('editUnit').value;
-        const factor = (unit === 'g' || unit === 'ml') ? qty / 100 : qty;
-
-        document.getElementById('ov_kcal').value = Math.round(state.tempFood.baseCalories * factor);
-        document.getElementById('ov_protein').value = Math.round(state.tempFood.baseProtein * factor);
-        document.getElementById('ov_carbs').value = Math.round(state.tempFood.baseCarbs * factor);
-        document.getElementById('ov_fat').value = Math.round(state.tempFood.baseFat * factor);
-
-        // FIX: Safe Access to micros
-        const safeMicros = state.tempFood.micros || {};
-        ALL_MICROS.forEach(k => {
-             const el = document.getElementById(`ov_${k}`);
-             if(el) {
-                 const baseVal = safeMicros[k] || 0;
-                 el.value = parseFloat((baseVal * factor).toFixed(2));
-             }
-        });
-
-    } else {
-        displayDiv.classList.remove('hidden');
-        manualDiv.classList.add('hidden');
-    }
-}
-
-function updateEditPreview() {
-    const qty = parseFloat(document.getElementById('editQty').value) || 0;
-    const unit = document.getElementById('editUnit').value;
-    const factor = (unit === 'g' || unit === 'ml') ? qty / 100 : qty;
-
-    document.getElementById('editKcal').innerText = Math.round(state.tempFood.baseCalories * factor);
-    document.getElementById('editProt').innerText = Math.round(state.tempFood.baseProtein * factor);
-    document.getElementById('editCarbs').innerText = Math.round(state.tempFood.baseCarbs * factor);
-    document.getElementById('editFat').innerText = Math.round(state.tempFood.baseFat * factor);
+    document.getElementById('editNameVal').value = f.name;
+    document.getElementById('editSource').innerText = f.source || 'Manual';
     
-    if(document.getElementById('advancedEditToggle').checked) {
-         document.getElementById('ov_kcal').value = Math.round(state.tempFood.baseCalories * factor);
-         document.getElementById('ov_protein').value = Math.round(state.tempFood.baseProtein * factor);
-         document.getElementById('ov_carbs').value = Math.round(state.tempFood.baseCarbs * factor);
-         document.getElementById('ov_fat').value = Math.round(state.tempFood.baseFat * factor);
-         
-         const safeMicros = state.tempFood.micros || {};
-         ALL_MICROS.forEach(k => {
-             const el = document.getElementById(`ov_${k}`);
-             if(el) {
-                 const baseVal = safeMicros[k] || 0;
-                 el.value = parseFloat((baseVal * factor).toFixed(2));
-             }
-         });
-    }
+    document.getElementById('editQty').value = qtyOverride || f.qty || 100;
+    document.getElementById('editUnit').value = f.unit || 'g';
+    
+    updateEditFields(); // Populate inputs
+}
+
+// Recalculate displayed values when Qty changes
+document.getElementById('editQty').addEventListener('input', updateEditFields);
+document.getElementById('editUnit').addEventListener('change', updateEditFields);
+
+function updateEditFields() {
+    const qty = parseFloat(document.getElementById('editQty').value) || 0;
+    // For simplicity, assuming g/ml are linear. 
+    const totalFactor = qty; 
+
+    const base = state.tempFood.base;
+    
+    // Set Macros
+    document.getElementById('val_calories').value = Math.round(base.calories * totalFactor);
+    document.getElementById('val_protein').value = (base.protein * totalFactor).toFixed(1);
+    document.getElementById('val_carbs').value = (base.carbs * totalFactor).toFixed(1);
+    document.getElementById('val_fat').value = (base.fat * totalFactor).toFixed(1);
+
+    // Set All Nutrients
+    ALL_NUTRIENTS.forEach(k => {
+        const val = (base.nutrients[k] || 0) * totalFactor;
+        const el = document.getElementById(`val_${k}`);
+        if(el) el.value = val > 0 ? val.toFixed(1) : ''; // Leave empty if 0 for cleaner look
+    });
 }
 
 window.saveLog = function() {
     const qty = parseFloat(document.getElementById('editQty').value);
     const unit = document.getElementById('editUnit').value;
+    const name = document.getElementById('editNameVal').value;
     const meal = document.getElementById('editMeal').value;
-    const isAdvanced = document.getElementById('advancedEditToggle').checked;
-    
-    let calories, protein, carbs, fat;
-    let finalMicros = { ...(state.tempFood.micros || {}) };
 
-    if (isAdvanced) {
-        calories = parseFloat(document.getElementById('ov_kcal').value) || 0;
-        protein = parseFloat(document.getElementById('ov_protein').value) || 0;
-        carbs = parseFloat(document.getElementById('ov_carbs').value) || 0;
-        fat = parseFloat(document.getElementById('ov_fat').value) || 0;
-        
-        ALL_MICROS.forEach(k => {
-            const val = parseFloat(document.getElementById(`ov_${k}`).value) || 0;
-            finalMicros[k] = val; 
-        });
-    } else {
-        const factor = (unit === 'g' || unit === 'ml') ? qty / 100 : qty;
-        calories = state.tempFood.baseCalories * factor;
-        protein = state.tempFood.baseProtein * factor;
-        carbs = state.tempFood.baseCarbs * factor;
-        fat = state.tempFood.baseFat * factor;
-        
-        Object.keys(finalMicros).forEach(k => {
-            finalMicros[k] = (state.tempFood.micros[k] || 0) * factor;
-        });
-    }
-    
+    // Re-read values from inputs (allowing user to override calculation)
+    const getVal = (id) => parseFloat(document.getElementById(id).value) || 0;
+
+    const nutrients = {};
+    ALL_NUTRIENTS.forEach(k => {
+        nutrients[k] = getVal(`val_${k}`);
+    });
+
     const log = {
         id: state.tempFood.isNew ? Math.random().toString(36).substr(2, 9) : state.tempFood.id,
         date: state.currentDate,
         timestamp: new Date().toISOString(),
-        meal,
-        name: state.tempFood.name,
-        qty, unit,
-        calories, protein, carbs, fat,
-        micros: finalMicros,
-        baseCalories: state.tempFood.baseCalories,
-        baseProtein: state.tempFood.baseProtein,
-        baseCarbs: state.tempFood.baseCarbs,
-        baseFat: state.tempFood.baseFat
+        meal, name, qty, unit,
+        calories: getVal('val_calories'),
+        protein: getVal('val_protein'),
+        carbs: getVal('val_carbs'),
+        fat: getVal('val_fat'),
+        nutrients: nutrients, // New expanded structure
+        // Keep base for future edits if needed, though simpler to just re-calc on edit
+        base: state.tempFood.base 
     };
 
-    if (state.tempFood.isNew) {
-        state.logs.push(log);
-    } else {
+    if (state.tempFood.isNew) state.logs.push(log);
+    else {
         const idx = state.logs.findIndex(l => l.id === log.id);
         if (idx !== -1) state.logs[idx] = log;
     }
 
     localStorage.setItem('foodlog_logs', JSON.stringify(state.logs));
     closeEditModal();
-    if (state.activeTab !== 'analyze') document.getElementById('addModal').classList.add('translate-y-full');
+    document.getElementById('addModal').classList.add('translate-y-full');
     init();
 };
 
+[cite_start]// --- UPDATED MICROS VIEW [cite: 1] ---
 window.openMicros = function() {
     const dayLogs = state.logs.filter(l => l.date === state.currentDate);
     const totals = {};
-    
-    ALL_MICROS.forEach(k => totals[k] = 0);
-    
+
     dayLogs.forEach(log => {
-        if(log.micros) {
-            Object.keys(log.micros).forEach(key => {
-                totals[key] = (totals[key] || 0) + (log.micros[key] || 0);
-            });
-        }
+        ALL_NUTRIENTS.forEach(k => {
+            const val = log.nutrients ? (log.nutrients[k] || 0) : 0; // Log values are already total
+            totals[k] = (totals[k] || 0) + val;
+        });
     });
 
+    const renderGroup = (title, keys) => `
+        <div class="mb-4">
+            <h4 class="text-emerald-400 font-bold mb-2 uppercase text-xs">${title}</h4>
+            ${keys.map(k => {
+                const val = totals[k] || 0;
+                return `<div class="flex justify-between border-b border-slate-800 py-1">
+                    <span class="text-slate-400 capitalize">${k.replace(/_/g, ' ')}</span>
+                    <span class="text-white">${Math.round(val*10)/10}</span>
+                </div>`;
+            }).join('')}
+        </div>
+    `;
+
     let html = '';
-    
-    Object.keys(MICRO_GROUPS).forEach(groupName => {
-        html += `<div class="font-bold text-emerald-400 text-xs uppercase tracking-wider mb-2 mt-4 border-b border-slate-700 pb-1">${groupName}</div>`;
-        html += `<div class="space-y-1">`;
-        
-        MICRO_GROUPS[groupName].forEach(key => {
-            const val = totals[key] || 0;
-            if (val > 0.1 || groupName === 'Breakdown') { 
-                html += `
-                    <div class="flex justify-between items-center text-sm">
-                        <span class="text-slate-400 capitalize">${key.replace(/_/g, ' ')}</span>
-                        <span class="text-white font-mono">${Math.round(val*10)/10}</span>
-                    </div>
-                `;
-            }
-        });
-        html += `</div>`;
-    });
+    html += renderGroup('Details (g/mg)', NUTRIENT_GROUPS.details);
+    html += renderGroup('Vitamins', NUTRIENT_GROUPS.vitamins);
+    html += renderGroup('Minerals', NUTRIENT_GROUPS.minerals);
 
     document.getElementById('microList').innerHTML = html;
     document.getElementById('microsModal').classList.remove('hidden');
 };
 
-// --- FIX: EXPORT JSON (Re-implemented) ---
-window.exportJSON = () => {
-    const today = new Date();
-    const pastDate = new Date();
-    pastDate.setDate(today.getDate() - 30); 
+// ... keep existing utils (closeAddModal, closeEditModal, etc.) ...
+[cite_start]// Ensure `handleVision` calls `prepFoodForEdit(data, true)` to trigger the verification step [cite: 7]
+window.handleVision = async function(input) {
+    if (!input.files[0]) return;
+    document.getElementById('searchResults').innerHTML = '<div class="text-center mt-10">AI analyzing...</div>';
 
-    const recentLogs = state.logs.filter(l => new Date(l.date) >= pastDate);
+    const formData = new FormData();
+    formData.append('image', input.files[0]);
 
-    const exportData = recentLogs.map((l, index) => {
-        const item = {
-            date: l.timestamp || l.date, 
-            name: l.name,
-            calories: Math.round(l.calories),
-            protein: Math.round(l.protein * 10) / 10,
-            carbs: Math.round(l.carbs * 10) / 10,
-            fat: Math.round(l.fat * 10) / 10
-        };
-        
-        // FIX: Use ALL_MICROS constant
-        const micros = l.micros || {};
-        ALL_MICROS.forEach(key => {
-            if (micros[key]) {
-                item[key] = Math.round(micros[key] * 100) / 100;
-            }
-        });
-
-        return item;
-    });
-
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ logs: exportData }));
-    const link = document.createElement("a");
-    link.setAttribute("href", dataStr);
-    link.setAttribute("download", `foodlog_sync.json`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-};
-
-// Boilerplate
-window.closeEditModal = () => document.getElementById('editModal').classList.add('hidden');
-window.closeAddModal = () => document.getElementById('addModal').classList.add('translate-y-full');
-window.openAddModal = (meal) => {
-    if(meal) state.selectedMeal = meal;
-    document.getElementById('addModal').classList.remove('translate-y-full');
-    setSearchMode('search');
-};
-window.setSearchMode = (mode) => {
-    state.activeTab = mode;
-    ['search', 'analyze', 'create', 'favs'].forEach(v => {
-        const el = document.getElementById(`view-${v}`);
-        const tab = document.getElementById(`tab-${v}`);
-        if(v === mode) {
-            el.classList.remove('hidden'); el.classList.add('flex');
-            tab.className = "text-emerald-400 border-b-2 border-emerald-400 pb-1 whitespace-nowrap";
-        } else {
-            el.classList.add('hidden'); el.classList.remove('flex');
-            tab.className = "text-slate-400 pb-1 whitespace-nowrap";
+    try {
+        const res = await fetch('/api/vision', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.name) {
+             // Pass straight to edit for "Verify" step
+            prepFoodForEdit({
+                ...data,
+                source: 'AI Vision'
+            }, true);
         }
-    });
+    } catch (e) {
+        alert("Vision failed");
+    }
 };
-
-window.handleManualBarcode = () => { /* Add logic if needed */ };
-window.triggerVision = () => { document.getElementById('visionGal').click(); };
-window.handleVision = () => { /* Add logic if needed */ };
-window.deleteLog = () => { /* Add logic if needed */ };
 
 init();
