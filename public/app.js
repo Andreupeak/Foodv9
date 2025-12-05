@@ -29,6 +29,42 @@ const MICRO_KEYS = [
     'caffeine', 'water'
 ];
 
+// Standard RDI Values (Approx for Adults)
+const RDI_VALUES = {
+    sugars: 50, // g (Added sugar limit)
+    fiber: 30, // g
+    saturated_fat: 20, // g
+    sodium: 2300, // mg
+    potassium: 3500, // mg
+    chloride: 2300, // mg
+    calcium: 1000, // mg
+    magnesium: 400, // mg
+    zinc: 11, // mg
+    iron: 14, // mg
+    phosphorus: 700, // mg
+    iodine: 150, // µg
+    selenium: 55, // µg
+    copper: 1, // mg
+    manganese: 2.3, // mg
+    chromium: 35, // µg
+    molybdenum: 45, // µg
+    vitamin_a: 900, // µg
+    vitamin_c: 90, // mg
+    vitamin_d: 20, // µg
+    vitamin_e: 15, // mg
+    vitamin_k: 120, // µg
+    thiamin: 1.2, // mg
+    riboflavin: 1.3, // mg
+    niacin: 16, // mg
+    vitamin_b6: 1.7, // mg
+    folic_acid: 400, // µg
+    vitamin_b12: 2.4, // µg
+    biotin: 30, // µg
+    pantothenic_acid: 5, // mg
+    caffeine: 400, // mg (Safe limit)
+    water: 2500 // g
+};
+
 // --- INIT ---
 function init() {
     renderDate();
@@ -45,7 +81,7 @@ window.switchMainView = function(view) {
     // UI Toggles
     document.getElementById('view-dashboard').classList.toggle('hidden', view !== 'diary');
     document.getElementById('view-coach').classList.toggle('hidden', view !== 'coach');
-    document.getElementById('view-coach').classList.toggle('flex', view === 'coach'); // Coach needs flex
+    document.getElementById('view-coach').classList.toggle('flex', view === 'coach'); 
     
     // Nav Active State
     document.getElementById('nav-diary').classList.toggle('text-emerald-400', view === 'diary');
@@ -242,7 +278,7 @@ window.setSearchMode = function(mode) {
 let searchTimeout;
 document.getElementById('searchInput').addEventListener('input', (e) => {
     clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => performSearch(e.target.value), 600);
+    searchTimeout = setTimeout(() => performSearch(e.target.value), 400); // Faster input response
 });
 
 async function performSearch(query) {
@@ -656,11 +692,20 @@ window.openMicros = function() {
         html += `<div class="space-y-1">`;
         groups[groupName].forEach(key => {
             const val = totals[key] || 0;
+            const rdi = RDI_VALUES[key];
+            let percentHtml = '';
+            
+            if(rdi) {
+                const pct = Math.round((val / rdi) * 100);
+                percentHtml = `<div class="text-[10px] ${pct >= 100 ? 'text-emerald-400' : 'text-blue-400'}">${pct}%</div>`;
+            }
+
             html += `
                 <div class="flex justify-between items-center bg-slate-800 p-2 rounded-lg border border-slate-700">
                     <span class="text-slate-400 text-xs">${labels[key] || key}</span>
                     <div class="text-right">
                         <div class="text-white font-bold text-sm">${Math.round(val * 10) / 10}</div>
+                        ${percentHtml}
                     </div>
                 </div>
             `;
