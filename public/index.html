@@ -11,6 +11,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@zxing/library@latest"></script>
 <script src="https://unpkg.com/@zxing/browser@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
@@ -38,57 +39,82 @@
 
     <main class="flex-1 overflow-y-auto p-4 pb-24 hide-scrollbar" id="main-view">
         
-        <div class="bg-slate-900 rounded-2xl p-5 mb-5 border border-slate-800 relative">
-            <button onclick="openMicros()" class="absolute top-4 right-4 text-xs text-emerald-400 bg-emerald-950 px-2 py-1 rounded border border-emerald-900">
-                <i class="fa-solid fa-vial"></i> Details
-            </button>
+        <!-- DASHBOARD VIEW -->
+        <div id="view-dashboard">
+            <div class="bg-slate-900 rounded-2xl p-5 mb-5 border border-slate-800 relative">
+                <button onclick="openMicros()" class="absolute top-4 right-4 text-xs text-emerald-400 bg-emerald-950 px-2 py-1 rounded border border-emerald-900">
+                    <i class="fa-solid fa-vial"></i> Details
+                </button>
 
-            <div class="flex items-center">
-                <div class="relative w-28 h-28 rounded-full conic-gradient flex items-center justify-center shadow-2xl shadow-emerald-900/20" id="calCircle" style="--color: #34d399; --percent: 0%;">
-                    <div class="w-24 h-24 bg-slate-900 rounded-full flex flex-col items-center justify-center border-4 border-slate-900">
-                        <span class="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Remaining</span>
-                        <span class="text-2xl font-bold text-white" id="calRemaining">--</span>
-                        <span class="text-[10px] text-slate-500">kcal</span>
+                <div class="flex items-center">
+                    <div class="relative w-28 h-28 rounded-full conic-gradient flex items-center justify-center shadow-2xl shadow-emerald-900/20" id="calCircle" style="--color: #34d399; --percent: 0%;">
+                        <div class="w-24 h-24 bg-slate-900 rounded-full flex flex-col items-center justify-center border-4 border-slate-900">
+                            <span class="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Remaining</span>
+                            <span class="text-2xl font-bold text-white" id="calRemaining">--</span>
+                            <span class="text-[10px] text-slate-500">kcal</span>
+                        </div>
                     </div>
-                </div>
-                <div class="flex-1 ml-6 space-y-3">
-                    <div class="space-y-1">
-                        <div class="flex justify-between text-xs text-slate-400"><span>Carbs</span><span id="carbVal">0/0g</span></div>
-                        <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden"><div id="carbBar" class="h-full bg-blue-500 w-0 transition-all duration-500"></div></div>
-                    </div>
-                    <div class="space-y-1">
-                        <div class="flex justify-between text-xs text-slate-400"><span>Protein</span><span id="protVal">0/0g</span></div>
-                        <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden"><div id="protBar" class="h-full bg-red-500 w-0 transition-all duration-500"></div></div>
-                    </div>
-                    <div class="space-y-1">
-                        <div class="flex justify-between text-xs text-slate-400"><span>Fat</span><span id="fatVal">0/0g</span></div>
-                        <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden"><div id="fatBar" class="h-full bg-yellow-500 w-0 transition-all duration-500"></div></div>
+                    <div class="flex-1 ml-6 space-y-3">
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-xs text-slate-400"><span>Carbs</span><span id="carbVal">0/0g</span></div>
+                            <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden"><div id="carbBar" class="h-full bg-blue-500 w-0 transition-all duration-500"></div></div>
+                        </div>
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-xs text-slate-400"><span>Protein</span><span id="protVal">0/0g</span></div>
+                            <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden"><div id="protBar" class="h-full bg-red-500 w-0 transition-all duration-500"></div></div>
+                        </div>
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-xs text-slate-400"><span>Fat</span><span id="fatVal">0/0g</span></div>
+                            <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden"><div id="fatBar" class="h-full bg-yellow-500 w-0 transition-all duration-500"></div></div>
+                        </div>
                     </div>
                 </div>
             </div>
+
+            <div id="mealsContainer" class="space-y-4"></div>
         </div>
 
-        <div id="mealsContainer" class="space-y-4"></div>
+        <!-- AI COACH VIEW -->
+        <div id="view-coach" class="hidden flex-col h-full">
+            <div class="flex-1 overflow-y-auto pb-4 space-y-4" id="coachChatArea">
+                <div class="bg-slate-900 p-4 rounded-xl border border-slate-800">
+                    <p class="text-sm text-slate-300">
+                        👋 Hi! I'm your Nutrition Coach. I can analyze your food logs. 
+                        Try asking: 
+                        <br>• "How was my protein intake this week?"
+                        <br>• "Am I lacking any vitamins?"
+                        <br>• "Show me a chart of my calories for the last 7 days."
+                    </p>
+                </div>
+            </div>
+            
+            <div class="mt-2 bg-slate-900 p-2 rounded-xl border border-slate-800 flex gap-2">
+                <input type="text" id="coachInput" placeholder="Ask about your nutrition..." class="flex-1 bg-transparent text-white p-2 outline-none text-sm">
+                <button onclick="askCoach()" class="bg-emerald-600 text-white p-2 rounded-lg w-10 h-10 flex items-center justify-center">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
 
     </main>
 
-    <button onclick="openAddModal()" class="absolute bottom-20 right-4 bg-emerald-500 text-white w-14 h-14 rounded-full shadow-lg shadow-emerald-500/30 flex items-center justify-center text-2xl z-20 active:scale-95 transition-transform">
+    <button id="mainAddBtn" onclick="openAddModal()" class="absolute bottom-20 right-4 bg-emerald-500 text-white w-14 h-14 rounded-full shadow-lg shadow-emerald-500/30 flex items-center justify-center text-2xl z-20 active:scale-95 transition-transform">
         <i class="fa-solid fa-plus"></i>
     </button>
 
     <nav class="bg-slate-900 border-t border-slate-800 flex justify-around py-3 z-30 pb-safe">
-        <button class="nav-item active flex flex-col items-center text-[10px] gap-1 text-emerald-400" onclick="switchView('diary')">
+        <button id="nav-diary" class="nav-item active flex flex-col items-center text-[10px] gap-1 text-emerald-400" onclick="switchMainView('diary')">
             <i class="fa-solid fa-book-open text-xl"></i> Diary
+        </button>
+        <button id="nav-coach" class="nav-item flex flex-col items-center text-[10px] gap-1 text-slate-500" onclick="switchMainView('coach')">
+            <i class="fa-solid fa-user-doctor text-xl"></i> AI Coach
         </button>
         <button class="nav-item flex flex-col items-center text-[10px] gap-1 text-slate-500" onclick="openPlanner()">
             <i class="fa-solid fa-carrot text-xl"></i> Planner
         </button>
         <button class="nav-item flex flex-col items-center text-[10px] gap-1 text-slate-500" onclick="exportJSON()">
-    <i class="fa-solid fa-file-code text-xl"></i> Export JSON
-</button>
-
-
-        
+            <i class="fa-solid fa-file-code text-xl"></i> Export
+        </button>
     </nav>
 
     <div id="addModal" class="fixed inset-0 bg-slate-950 z-50 translate-y-full transition-transform duration-300 flex flex-col">
