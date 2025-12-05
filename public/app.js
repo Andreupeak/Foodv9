@@ -724,6 +724,33 @@ window.stopScanner = function() {
     }
 };
 
+window.manualBarcode = function() {
+    const code = prompt("Enter barcode number:");
+    if(code) {
+        stopScanner();
+        document.getElementById('searchInput').value = code;
+        
+        // Direct barcode search
+        const resDiv = document.getElementById('searchResults');
+        resDiv.innerHTML = '<div class="text-center mt-4"><i class="fa-solid fa-spinner fa-spin text-emerald-500"></i> checking barcode...</div>';
+        
+        fetch('/api/search', {
+             method: 'POST',
+             headers: {'Content-Type': 'application/json'},
+             body: JSON.stringify({ query: code, mode: 'barcode' })
+        }).then(r => r.json()).then(data => {
+            if(data.length > 0) {
+                prepFoodForEdit(data[0], true);
+            } else {
+                resDiv.innerHTML = '<div class="text-center text-slate-500">Barcode not found in database.</div>';
+                // Fallback to text search if barcode fails?
+                performSearch(code);
+            }
+        }).catch(() => {
+             resDiv.innerHTML = '<div class="text-center text-red-500">Network Error.</div>';
+        });
+    }
+};
 
 // --- VISION ---
 window.triggerVision = function(type) {
