@@ -7,21 +7,19 @@
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#0f172a">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@zxing/library@latest"></script>
-    <script src="https://unpkg.com/@zxing/browser@latest"></script>
+<script src="https://unpkg.com/@zxing/browser@latest"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        /* Dark Mode Conic Gradient */
         .conic-gradient { background: conic-gradient(var(--color) var(--percent), #1e293b 0); }
         .input-dark { width: 100%; background: #1e293b; border: 1px solid #334155; padding: 8px; border-radius: 8px; color: white; margin-top: 4px; }
         .input-dark:focus { border-color: #34d399; outline: none; }
-        /* Collapsible details styling */
-        details > summary { list-style: none; cursor: pointer; padding: 10px; background: #1e293b; border-radius: 8px; margin-bottom: 5px; font-weight: bold; color: #94a3b8; }
-        details[open] > summary { color: #34d399; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
-        details > div { padding: 10px; background: #0f172a; border: 1px solid #1e293b; border-top: none; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100 h-screen flex flex-col overflow-hidden">
@@ -32,9 +30,6 @@
             <div id="currentDateDisplay" class="text-xs text-slate-400 font-medium mt-0.5">Today</div>
         </div>
         <div class="flex gap-3">
-             <button onclick="openMicros()" class="text-xs text-emerald-400 bg-emerald-950 px-3 py-1 rounded border border-emerald-900 flex items-center gap-1">
-                <i class="fa-solid fa-vial"></i> Micros
-            </button>
             <button onclick="changeDate(-1)" class="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-300"><i class="fa-solid fa-chevron-left"></i></button>
             <button onclick="changeDate(1)" class="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-300"><i class="fa-solid fa-chevron-right"></i></button>
             <button onclick="openProfile()" class="w-8 h-8 rounded-full bg-emerald-900/50 text-emerald-400 flex items-center justify-center border border-emerald-800"><i class="fa-solid fa-user"></i></button>
@@ -42,7 +37,12 @@
     </header>
 
     <main class="flex-1 overflow-y-auto p-4 pb-24 hide-scrollbar" id="main-view">
+        
         <div class="bg-slate-900 rounded-2xl p-5 mb-5 border border-slate-800 relative">
+            <button onclick="openMicros()" class="absolute top-4 right-4 text-xs text-emerald-400 bg-emerald-950 px-2 py-1 rounded border border-emerald-900">
+                <i class="fa-solid fa-vial"></i> Details
+            </button>
+
             <div class="flex items-center">
                 <div class="relative w-28 h-28 rounded-full conic-gradient flex items-center justify-center shadow-2xl shadow-emerald-900/20" id="calCircle" style="--color: #34d399; --percent: 0%;">
                     <div class="w-24 h-24 bg-slate-900 rounded-full flex flex-col items-center justify-center border-4 border-slate-900">
@@ -67,7 +67,9 @@
                 </div>
             </div>
         </div>
+
         <div id="mealsContainer" class="space-y-4"></div>
+
     </main>
 
     <button onclick="openAddModal()" class="absolute bottom-20 right-4 bg-emerald-500 text-white w-14 h-14 rounded-full shadow-lg shadow-emerald-500/30 flex items-center justify-center text-2xl z-20 active:scale-95 transition-transform">
@@ -75,31 +77,19 @@
     </button>
 
     <nav class="bg-slate-900 border-t border-slate-800 flex justify-around py-3 z-30 pb-safe">
-        <button class="nav-item active flex flex-col items-center text-[10px] gap-1 text-emerald-400" onclick="switchMainView('diary')">
+        <button class="nav-item active flex flex-col items-center text-[10px] gap-1 text-emerald-400" onclick="switchView('diary')">
             <i class="fa-solid fa-book-open text-xl"></i> Diary
         </button>
         <button class="nav-item flex flex-col items-center text-[10px] gap-1 text-slate-500" onclick="openPlanner()">
             <i class="fa-solid fa-carrot text-xl"></i> Planner
         </button>
-        <button class="nav-item flex flex-col items-center text-[10px] gap-1 text-slate-500" onclick="switchMainView('coach')">
-            <i class="fa-solid fa-robot text-xl"></i> AI Coach
-        </button>
         <button class="nav-item flex flex-col items-center text-[10px] gap-1 text-slate-500" onclick="exportJSON()">
-            <i class="fa-solid fa-file-code text-xl"></i> Export
-        </button>
-    </nav>
+    <i class="fa-solid fa-file-code text-xl"></i> Export JSON
+</button>
 
-    <div id="view-coach" class="hidden absolute inset-0 bg-slate-950 z-10 flex flex-col pt-[70px] pb-[80px]">
-        <div id="coachChat" class="flex-1 overflow-y-auto p-4 space-y-4">
-            <div class="bg-slate-900 p-3 rounded-xl rounded-tl-none border border-slate-800 text-sm text-slate-300">
-                Hi! I'm your AI Nutrition Coach. I have access to all your logs (micros, macros, vitamins). Ask me anything about your progress!
-            </div>
-        </div>
-        <div class="p-4 bg-slate-900 border-t border-slate-800 flex gap-2">
-            <input type="text" id="coachInput" class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white outline-none focus:border-emerald-500" placeholder="Ask about your week...">
-            <button onclick="askCoach()" class="bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold"><i class="fa-solid fa-paper-plane"></i></button>
-        </div>
-    </div>
+
+        
+    </nav>
 
     <div id="addModal" class="fixed inset-0 bg-slate-950 z-50 translate-y-full transition-transform duration-300 flex flex-col">
         <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900">
@@ -116,20 +106,10 @@
         <div id="view-search" class="flex flex-col flex-1 p-4">
             <div id="scanner-container" class="mb-4 hidden rounded-lg overflow-hidden relative border border-slate-700 h-64 bg-black"></div>
             
-            <div id="manualBarcodeInput" class="hidden mb-2">
-                 <div class="flex gap-2">
-                    <input type="text" id="pasteBarcode" class="flex-1 input-dark" placeholder="Paste/Type Barcode">
-                    <button onclick="searchManualBarcode()" class="bg-emerald-600 px-3 rounded-lg text-white"><i class="fa-solid fa-arrow-right"></i></button>
-                 </div>
-            </div>
-
             <div class="relative mb-4">
                 <i class="fa-solid fa-magnifying-glass absolute left-4 top-3.5 text-slate-500"></i>
-                <input type="text" id="searchInput" placeholder="Search (e.g., 'Big Mac')" class="w-full bg-slate-800 text-white p-3 pl-10 rounded-xl border border-slate-700 focus:border-emerald-500 outline-none">
-                <div class="absolute right-3 top-2.5 flex gap-1">
-                    <button onclick="toggleManualBarcode()" class="text-slate-400 bg-slate-700 p-1.5 rounded-lg text-xs" title="Type Code"><i class="fa-solid fa-keyboard"></i></button>
-                    <button onclick="startScanner()" class="text-slate-400 bg-slate-700 p-1.5 rounded-lg"><i class="fa-solid fa-barcode"></i></button>
-                </div>
+                <input type="text" id="searchInput" placeholder="Search (e.g., 'Big Mac' or 'Mivolis')" class="w-full bg-slate-800 text-white p-3 pl-10 rounded-xl border border-slate-700 focus:border-emerald-500 outline-none">
+                <button onclick="startScanner()" class="absolute right-3 top-2.5 text-slate-400 bg-slate-700 p-1.5 rounded-lg"><i class="fa-solid fa-barcode"></i></button>
             </div>
 
             <div class="grid grid-cols-2 gap-3 mb-4">
@@ -140,18 +120,92 @@
                     <i class="fa-solid fa-image text-blue-400"></i> Upload Pic
                 </button>
             </div>
-            <div id="searchResults" class="flex-1 overflow-y-auto space-y-2 pb-10"></div>
+
+            <div id="searchResults" class="flex-1 overflow-y-auto space-y-2 pb-10">
+                <div class="text-center text-slate-600 mt-10 text-sm">
+                    Search databases or use AI scan.<br>
+                    Try searching for supplements or fast food directly.
+                </div>
+            </div>
         </div>
 
         <div id="view-analyze" class="hidden flex-col flex-1 p-4">
-             <textarea id="analyzeInput" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white h-32 mb-3" placeholder="e.g. 1 cup rice, 100g chicken"></textarea>
+             <p class="text-sm text-slate-400 mb-2">Enter recipe or ingredient list:</p>
+             <textarea id="analyzeInput" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white h-32 mb-3" placeholder="e.g. 1 cup rice, 100g chicken breast, 1 tsp oil"></textarea>
              <button onclick="analyzeIngredients()" class="w-full py-3 bg-blue-600 rounded-xl font-bold mb-4">Analyze Nutrition</button>
              <div id="analyzeResults" class="space-y-2 flex-1 overflow-y-auto pb-10"></div>
         </div>
 
-        <div id="view-create" class="hidden flex-col flex-1 p-4">
-             <button onclick="createEmptyLog()" class="w-full py-3 bg-emerald-600 rounded-xl font-bold">Start Blank Log</button>
-             <p class="text-center text-slate-500 mt-4 text-sm">Creates a blank item you can fully edit.</p>
+        <div id="view-create" class="hidden flex-col flex-1 p-4 overflow-y-auto">
+            <div class="space-y-3 pb-10">
+                <div><label class="text-xs text-slate-500">Name</label><input id="manName" class="input-dark" type="text" placeholder="Item Name"></div>
+                <div class="grid grid-cols-2 gap-3">
+                     <div><label class="text-xs text-slate-500">Qty</label><input id="manQty" class="input-dark" type="number" value="100"></div>
+                     <div><label class="text-xs text-slate-500">Unit</label><input id="manUnit" class="input-dark" type="text" value="g"></div>
+                </div>
+                <div class="grid grid-cols-4 gap-2">
+                     <div><label class="text-xs text-slate-500">Kcal</label><input id="manKcal" class="input-dark" type="number" placeholder="0"></div>
+                     <div><label class="text-xs text-slate-500">P</label><input id="manProt" class="input-dark" type="number" placeholder="0"></div>
+                     <div><label class="text-xs text-slate-500">C</label><input id="manCarb" class="input-dark" type="number" placeholder="0"></div>
+                     <div><label class="text-xs text-slate-500">F</label><input id="manFat" class="input-dark" type="number" placeholder="0"></div>
+                </div>
+                
+                <!-- Expanded Manual Entry -->
+                <div class="border-t border-slate-800 pt-3 mt-3">
+                    
+                    <p class="text-sm font-bold text-slate-300 mb-2">Macro Details</p>
+                    <div class="grid grid-cols-2 gap-3">
+                         <div><label class="text-[10px] text-slate-500">Sugars (g)</label><input id="man_sugars" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Fiber (g)</label><input id="man_fiber" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Sat. Fat (g)</label><input id="man_saturated_fat" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Mono. Fat (g)</label><input id="man_monounsaturated_fat" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Poly. Fat (g)</label><input id="man_polyunsaturated_fat" class="input-dark" type="number"></div>
+                    </div>
+
+                    <p class="text-sm font-bold text-slate-300 mb-2 mt-4">Vitamins</p>
+                    <div class="grid grid-cols-2 gap-3">
+                         <div><label class="text-[10px] text-slate-500">Vit A (µg)</label><input id="man_vitamin_a" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Vit C (mg)</label><input id="man_vitamin_c" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Vit D3 (µg)</label><input id="man_vitamin_d" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Vit E (mg)</label><input id="man_vitamin_e" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Vit K1 (µg)</label><input id="man_vitamin_k" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">B1 Thiamin (mg)</label><input id="man_thiamin" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">B2 Riboflavin (mg)</label><input id="man_riboflavin" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">B3 Niacin (mg)</label><input id="man_niacin" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">B5 Pantothenic (mg)</label><input id="man_pantothenic_acid" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">B6 Pyridoxine (mg)</label><input id="man_vitamin_b6" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">B7 Biotin (µg)</label><input id="man_biotin" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">B9 Folic Acid (µg)</label><input id="man_folic_acid" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">B12 Cobalamin (µg)</label><input id="man_vitamin_b12" class="input-dark" type="number"></div>
+                    </div>
+
+                    <p class="text-sm font-bold text-slate-300 mb-2 mt-4">Minerals & Electrolytes</p>
+                    <div class="grid grid-cols-2 gap-3">
+                         <div><label class="text-[10px] text-slate-500">Sodium (mg)</label><input id="man_sodium" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Potassium (mg)</label><input id="man_potassium" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Calcium (mg)</label><input id="man_calcium" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Magnesium (mg)</label><input id="man_magnesium" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Zinc (mg)</label><input id="man_zinc" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Iron (mg)</label><input id="man_iron" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Phosphorus (mg)</label><input id="man_phosphorus" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Chloride (mg)</label><input id="man_chloride" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Iodine (µg)</label><input id="man_iodine" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Selenium (µg)</label><input id="man_selenium" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Copper (mg)</label><input id="man_copper" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Manganese (mg)</label><input id="man_manganese" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Chromium (µg)</label><input id="man_chromium" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Molybdenum (µg)</label><input id="man_molybdenum" class="input-dark" type="number"></div>
+                    </div>
+
+                    <p class="text-sm font-bold text-slate-300 mb-2 mt-4">Other</p>
+                    <div class="grid grid-cols-2 gap-3">
+                         <div><label class="text-[10px] text-slate-500">Caffeine (mg)</label><input id="man_caffeine" class="input-dark" type="number"></div>
+                         <div><label class="text-[10px] text-slate-500">Water (g)</label><input id="man_water" class="input-dark" type="number"></div>
+                    </div>
+                </div>
+
+                <button onclick="saveManualItem()" class="w-full py-3 bg-emerald-600 rounded-xl font-bold mt-4">Add to Diary</button>
+            </div>
         </div>
 
         <div id="view-favs" class="hidden flex-col flex-1 p-4">
@@ -159,113 +213,149 @@
         </div>
     </div>
 
-    <div id="editModal" class="fixed inset-0 bg-black/90 z-[60] hidden flex flex-col pb-safe">
-        <div class="p-4 bg-slate-900 border-b border-slate-800 flex justify-between items-center">
-            <div>
-                <h2 class="text-lg font-bold text-white">Edit Entry</h2>
-                <div class="text-xs text-emerald-400" id="editSource">Verified</div>
-            </div>
-            <div class="flex gap-2">
-                <button id="btnDeleteLog" onclick="deleteLog()" class="bg-slate-800 w-8 h-8 rounded-full text-red-400 hidden"><i class="fa-solid fa-trash"></i></button>
-                <button onclick="closeEditModal()" class="bg-slate-800 w-8 h-8 rounded-full text-slate-400"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-        </div>
-
-        <div class="flex-1 overflow-y-auto p-4 space-y-4">
-            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800">
-                <label class="text-[10px] text-slate-500 font-bold uppercase">Name</label>
-                <input type="text" id="editNameVal" class="w-full bg-transparent text-white font-bold text-xl border-b border-slate-700 pb-1 mb-4 outline-none">
-                
-                <div class="flex gap-3 mb-4">
-                    <div class="flex-1">
-                        <label class="text-[10px] text-slate-500 font-bold uppercase">Qty</label>
-                        <input type="number" id="editQty" class="w-full bg-slate-800 text-white text-2xl font-bold p-2 rounded border border-slate-700" value="100">
-                    </div>
-                    <div class="w-1/3">
-                        <label class="text-[10px] text-slate-500 font-bold uppercase">Unit</label>
-                        <select id="editUnit" class="w-full bg-slate-800 text-white text-lg p-2 rounded border border-slate-700 h-[50px]">
-                            <option value="g">g</option>
-                            <option value="ml">ml</option>
-                            <option value="portion">srv</option>
-                        </select>
-                    </div>
-                </div>
+    <div id="editModal" class="fixed inset-0 bg-black/80 z-[60] hidden flex items-end justify-center backdrop-blur-sm">
+        <div class="bg-slate-900 w-full rounded-t-3xl p-6 border-t border-slate-700 shadow-2xl">
+            <div class="flex justify-between items-start mb-4">
                 <div>
-                     <label class="text-[10px] text-slate-500 font-bold uppercase">Meal</label>
-                     <select id="editMeal" class="w-full bg-slate-800 text-white p-2 rounded border border-slate-700">
-                        <option value="Breakfast">Breakfast</option>
-                        <option value="Lunch">Lunch</option>
-                        <option value="Dinner">Dinner</option>
-                        <option value="Snacks">Snacks</option>
-                     </select>
+                    <h2 id="editName" class="text-xl font-bold text-white">Food Name</h2>
+                    <div class="text-xs text-emerald-400 mt-1" id="editSource">Source: Database</div>
+                </div>
+                <div class="flex gap-2">
+                    <button id="btnDeleteLog" onclick="deleteLog()" class="bg-slate-800 w-8 h-8 rounded-full text-red-400 hidden"><i class="fa-solid fa-trash"></i></button>
+                    <button onclick="closeEditModal()" class="bg-slate-800 w-8 h-8 rounded-full text-slate-400"><i class="fa-solid fa-xmark"></i></button>
                 </div>
             </div>
 
-            <div id="nutritionEditors" class="space-y-2">
-                <details open>
-                    <summary>Macronutrients</summary>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div><label class="text-[10px] text-slate-500">Calories</label><input id="val_calories" class="input-dark" type="number"></div>
-                        <div><label class="text-[10px] text-slate-500">Protein (g)</label><input id="val_protein" class="input-dark" type="number"></div>
-                        <div><label class="text-[10px] text-slate-500">Carbs (g)</label><input id="val_carbs" class="input-dark" type="number"></div>
-                        <div><label class="text-[10px] text-slate-500">Fat (g)</label><input id="val_fat" class="input-dark" type="number"></div>
-                    </div>
-                </details>
+            <div class="mb-4">
+                <label class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Meal</label>
+                <select id="editMeal" class="w-full bg-slate-800 text-white text-base p-3 rounded-xl mt-1 outline-none h-[46px] border border-slate-700">
+                    <option value="Breakfast">Breakfast</option>
+                    <option value="Lunch">Lunch</option>
+                    <option value="Dinner">Dinner</option>
+                    <option value="Snacks">Snacks</option>
+                </select>
+            </div>
 
-                <details>
-                    <summary>Carbs, Fats & Fiber</summary>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div><label class="text-[10px] text-slate-500">Sugar (g)</label><input id="val_sugar" class="input-dark" type="number"></div>
-                        <div><label class="text-[10px] text-slate-500">Fiber (g)</label><input id="val_fiber" class="input-dark" type="number"></div>
-                        <div><label class="text-[10px] text-slate-500">Saturated Fat (g)</label><input id="val_saturated_fat" class="input-dark" type="number"></div>
-                        <div><label class="text-[10px] text-slate-500">Mono Fat (g)</label><input id="val_monounsaturated_fat" class="input-dark" type="number"></div>
-                        <div><label class="text-[10px] text-slate-500">Poly Fat (g)</label><input id="val_polyunsaturated_fat" class="input-dark" type="number"></div>
-                    </div>
-                </details>
+            <div class="flex gap-4 mb-6">
+                <div class="flex-1">
+                    <label class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Quantity</label>
+                    <input type="number" id="editQty" class="w-full bg-slate-800 text-white text-2xl font-bold p-3 rounded-xl mt-1 focus:ring-1 ring-emerald-500 outline-none" value="100">
+                </div>
+                <div class="w-1/3">
+                    <label class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Unit</label>
+                    <select id="editUnit" class="w-full bg-slate-800 text-white text-lg p-3 rounded-xl mt-1 outline-none h-[56px]">
+                        <option value="g">g</option>
+                        <option value="ml">ml</option>
+                        <option value="portion">srv</option>
+                    </select>
+                </div>
+            </div>
 
-                <details>
-                    <summary>Other (Salt, Caffeine, Water)</summary>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div><label class="text-[10px] text-slate-500">Sodium (mg)</label><input id="val_sodium" class="input-dark" type="number"></div>
-                        <div><label class="text-[10px] text-slate-500">Potassium (mg)</label><input id="val_potassium" class="input-dark" type="number"></div>
-                        <div><label class="text-[10px] text-slate-500">Chloride (mg)</label><input id="val_chloride" class="input-dark" type="number"></div>
-                        <div><label class="text-[10px] text-slate-500">Caffeine (mg)</label><input id="val_caffeine" class="input-dark" type="number"></div>
-                        <div><label class="text-[10px] text-slate-500">Water (g)</label><input id="val_water" class="input-dark" type="number"></div>
-                    </div>
-                </details>
-
-                <details>
-                    <summary>Vitamins</summary>
-                    <div class="grid grid-cols-2 gap-3" id="editVitaminsContainer">
-                        </div>
-                </details>
-
-                <details>
-                    <summary>Minerals</summary>
-                    <div class="grid grid-cols-2 gap-3" id="editMineralsContainer">
-                         </div>
-                </details>
+            <div class="grid grid-cols-4 gap-2 mb-6">
+                <div class="bg-slate-800 rounded-lg p-2 text-center">
+                    <div class="text-[10px] text-slate-500">Kcal</div>
+                    <div id="editKcal" class="font-bold text-white">0</div>
+                </div>
+                <div class="bg-slate-800 rounded-lg p-2 text-center">
+                    <div class="text-[10px] text-slate-500">Carbs</div>
+                    <div id="editCarbs" class="font-bold text-blue-400">0</div>
+                </div>
+                <div class="bg-slate-800 rounded-lg p-2 text-center">
+                    <div class="text-[10px] text-slate-500">Prot</div>
+                    <div id="editProt" class="font-bold text-red-400">0</div>
+                </div>
+                <div class="bg-slate-800 rounded-lg p-2 text-center">
+                    <div class="text-[10px] text-slate-500">Fat</div>
+                    <div id="editFat" class="font-bold text-yellow-400">0</div>
+                </div>
+            </div>
+            
+            <div class="flex gap-3">
+                <button id="addToFavBtn" class="p-4 bg-slate-800 text-slate-400 rounded-xl"><i class="fa-regular fa-heart"></i></button>
+                <button onclick="saveLog()" class="flex-1 bg-emerald-600 text-white rounded-xl font-bold text-lg shadow-lg shadow-emerald-900/50">Add to Diary</button>
             </div>
         </div>
-        
-        <div class="p-4 bg-slate-900 border-t border-slate-800 flex gap-3">
-             <button id="addToFavBtn" class="p-4 bg-slate-800 text-slate-400 rounded-xl"><i class="fa-regular fa-heart"></i></button>
-             <button onclick="saveLog()" class="flex-1 bg-emerald-600 text-white rounded-xl font-bold text-lg shadow-lg shadow-emerald-900/50">Save Entry</button>
+    </div>
+
+    <div id="profileModal" class="fixed inset-0 bg-slate-950 z-50 translate-y-full transition-transform duration-300 overflow-y-auto">
+        <div class="p-4">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-emerald-400">Profile & Goals</h2>
+                <button onclick="closeProfile()" class="text-slate-400"><i class="fa-solid fa-xmark text-2xl"></i></button>
+            </div>
+
+            <div class="space-y-4 mb-6">
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="text-xs text-slate-500">Weight (kg)</label><input type="number" id="pWeight" class="input-dark" value="70"></div>
+                    <div><label class="text-xs text-slate-500">Height (cm)</label><input type="number" id="pHeight" class="input-dark" value="175"></div>
+                    <div><label class="text-xs text-slate-500">Age</label><input type="number" id="pAge" class="input-dark" value="30"></div>
+                    <div><label class="text-xs text-slate-500">Gender</label>
+                        <select id="pGender" class="input-dark"><option value="male">Male</option><option value="female">Female</option></select>
+                    </div>
+                </div>
+                <div><label class="text-xs text-slate-500">Activity Level</label>
+                    <select id="pActivity" class="input-dark">
+                        <option value="1.2">Sedentary (Office job)</option>
+                        <option value="1.375">Light Exercise (1-2 days)</option>
+                        <option value="1.55">Moderate (3-5 days)</option>
+                        <option value="1.725">Active (6-7 days)</option>
+                    </select>
+                </div>
+                <div><label class="text-xs text-slate-500">Goal</label>
+                    <select id="pGoal" class="input-dark">
+                        <option value="-500">Lose Weight (-0.5kg/week)</option>
+                        <option value="-250">Slow Cut (-0.25kg/week)</option>
+                        <option value="0">Maintain Weight</option>
+                        <option value="250">Lean Bulk (+0.25kg/week)</option>
+                        <option value="500">Gain Muscle (+0.5kg/week)</option>
+                    </select>
+                </div>
+            </div>
+
+            <button onclick="calculateGoals()" class="w-full py-3 bg-blue-600 rounded-xl font-bold mb-6">Auto Calculate Goals</button>
+
+            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 mb-6">
+                <h3 class="font-bold mb-3 text-emerald-400">Manual Goals (Override)</h3>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="text-xs text-slate-500">Daily Kcal</label><input type="number" id="manualKcal" class="input-dark" placeholder="Auto"></div>
+                    <div><label class="text-xs text-slate-500">Protein (g)</label><input type="number" id="manualProt" class="input-dark" placeholder="Auto"></div>
+                    <div><label class="text-xs text-slate-500">Carbs (g)</label><input type="number" id="manualCarb" class="input-dark" placeholder="Auto"></div>
+                    <div><label class="text-xs text-slate-500">Fat (g)</label><input type="number" id="manualFat" class="input-dark" placeholder="Auto"></div>
+                </div>
+                <button onclick="saveManualGoals()" class="w-full py-2 bg-emerald-900/50 text-emerald-400 border border-emerald-800 rounded-lg mt-3 text-sm font-bold">Save Manual Goals</button>
+            </div>
         </div>
     </div>
 
     <div id="microsModal" class="fixed inset-0 bg-black/80 z-[70] hidden flex items-center justify-center p-4">
         <div class="bg-slate-900 w-full max-w-sm rounded-2xl p-6 border border-slate-700 h-[80vh] flex flex-col">
             <div class="flex justify-between mb-4 shrink-0">
-                <h3 class="text-lg font-bold">Daily Nutrition</h3>
+                <h3 class="text-lg font-bold">Nutrient Breakdown</h3>
                 <button onclick="document.getElementById('microsModal').classList.add('hidden')"><i class="fa-solid fa-xmark"></i></button>
             </div>
-            <div id="microList" class="space-y-4 text-sm overflow-y-auto flex-1 pr-2"></div>
+            <div id="microList" class="space-y-2 text-sm overflow-y-auto flex-1 pr-2"></div>
+            <div class="text-[10px] text-slate-500 mt-4 text-center shrink-0">*Values are estimates.</div>
         </div>
     </div>
 
-    <div id="profileModal" class="fixed inset-0 bg-slate-950 z-50 translate-y-full transition-transform duration-300 overflow-y-auto"><div class="p-4"><button onclick="closeProfile()">Close</button> Profile Content Here...</div></div>
-    <div id="plannerModal" class="fixed inset-0 bg-slate-950 z-50 translate-y-full transition-transform duration-300 overflow-y-auto p-4"><div class="flex justify-between"><h2 class="text-xl">Meal Planner</h2><button onclick="closePlanner()">X</button></div><textarea id="plannerInput" class="w-full bg-slate-900 text-white p-2"></textarea><button onclick="generateMealPlan()" class="bg-blue-600 w-full p-2 mt-2 rounded">Plan</button><div id="plannerResult"></div></div>
+    <div id="plannerModal" class="fixed inset-0 bg-slate-950 z-50 translate-y-full transition-transform duration-300 overflow-y-auto p-4">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-bold text-emerald-400">AI Meal Planner</h2>
+            <button onclick="closePlanner()" class="text-slate-400"><i class="fa-solid fa-xmark text-2xl"></i></button>
+        </div>
+        <p class="text-sm text-slate-400 mb-2">Enter ingredients you have:</p>
+        <textarea id="plannerInput" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white h-24 mb-3" placeholder="e.g. Chicken breast, broccoli, rice, soy sauce..."></textarea>
+        <button onclick="generateMealPlan()" class="w-full py-3 bg-blue-600 rounded-xl font-bold mb-6">Generate Meal Idea</button>
+        
+        <div id="plannerResult" class="hidden bg-slate-900 p-4 rounded-xl border border-slate-800">
+            <h3 id="planTitle" class="font-bold text-lg mb-2 text-white"></h3>
+            <p id="planRecipe" class="text-sm text-slate-300 mb-4 whitespace-pre-wrap"></p>
+            <div class="bg-slate-950 p-3 rounded-lg">
+                <div class="text-xs font-bold text-slate-500 uppercase mb-2">Grocery List</div>
+                <ul id="planGrocery" class="text-sm space-y-1 list-disc list-inside text-slate-300"></ul>
+            </div>
+        </div>
+    </div>
 
     <input type="file" id="visionCam" accept="image/*" capture="environment" class="hidden" onchange="handleVision(this)">
     <input type="file" id="visionGal" accept="image/*" class="hidden" onchange="handleVision(this)">
