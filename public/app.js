@@ -415,19 +415,43 @@ window.selectFoodFromSearch = function(index) {
     prepFoodForEdit(item, true);
 };
 
+
 window.editExistingLog = function(id) {
     const log = state.logs.find(l => l.id === id);
     if(log) {
-        if(!log.baseCalories) {
-            const factor = (log.unit === 'g' || log.unit === 'ml') ? (log.qty / 100) : log.qty;
-            log.baseCalories = log.calories / factor;
-            log.baseProtein = log.protein / factor;
-            log.baseCarbs = log.carbs / factor;
-            log.baseFat = log.fat / factor;
+        // Calculate the scaling factor that was used for this log
+        // (e.g., if 30g was logged, factor is 0.3)
+        const factor = (log.unit === 'g' || log.unit === 'ml') ? (log.qty / 100) : log.qty;
+        const safeFactor = factor === 0 ? 1 : factor;
+
+        // Create a copy of the micros converted back to BASE values (per 100g/unit)
+        // This prevents the "double multiplication" bug
+        const baseMicros = {};
+        if (log.micros) {
+            Object.keys(log.micros).forEach(key => {
+                baseMicros[key] = log.micros[key] / safeFactor;
+            });
         }
-        prepFoodForEdit(log, false);
+
+        // Prepare a normalized object for the editor
+        // We use the Base Macros/Micros so the editor math works correctly
+        const editItem = {
+            ...log,
+            micros: baseMicros,
+            // Ensure we use Base Macros. If legacy log didn't save them, reverse-calc them.
+            baseCalories: log.baseCalories || (log.calories / safeFactor),
+            baseProtein: log.baseProtein || (log.protein / safeFactor),
+            baseCarbs: log.baseCarbs || (log.carbs / safeFactor),
+            baseFat: log.baseFat || (log.fat / safeFactor),
+            
+            // Normalize cost to base unit as well
+            cost: log.cost ? (log.cost / safeFactor) : 0
+        };
+
+        prepFoodForEdit(editItem, false);
     }
 };
+
 
 function prepFoodForEdit(item, isNew) {
     // Stop scanner if user selects a food
