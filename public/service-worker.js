@@ -1,11 +1,14 @@
-const CACHE_NAME = 'foodlog-v2';
+const CACHE_NAME = 'foodlog-v3';
 const urlsToCache = [
   '/',
   '/index.html',
   '/app.js',
+  '/manifest.json',
   'https://cdn.tailwindcss.com',
-  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css',
-  'https://unpkg.com/html5-qrcode'
+  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
+  'https://unpkg.com/@zxing/library@latest',
+  'https://unpkg.com/@zxing/browser@latest',
+  'https://cdn.jsdelivr.net/npm/chart.js'
 ];
 
 self.addEventListener('install', event => {
