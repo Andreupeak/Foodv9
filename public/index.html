@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -10,19 +11,46 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@zxing/library@latest"></script>
-<script src="https://unpkg.com/@zxing/browser@latest"></script>
+    <script src="https://unpkg.com/@zxing/browser@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
         /* Dark Mode Conic Gradient */
-        .conic-gradient { background: conic-gradient(var(--color) var(--percent), #1e293b 0); }
-        .input-dark { width: 100%; background: #1e293b; border: 1px solid #334155; padding: 8px; border-radius: 8px; color: white; margin-top: 4px; }
-        .input-dark:focus { border-color: #34d399; outline: none; }
+        .conic-gradient {
+            background: conic-gradient(var(--color) var(--percent), #1e293b 0);
+        }
+
+        .input-dark {
+            width: 100%;
+            background: #1e293b;
+            border: 1px solid #334155;
+            padding: 8px;
+            border-radius: 8px;
+            color: white;
+            margin-top: 4px;
+        }
+
+        .input-dark:focus {
+            border-color: #34d399;
+            outline: none;
+        }
     </style>
 </head>
+
 <body class="bg-slate-950 text-slate-100 h-screen flex flex-col overflow-hidden">
 
     <header class="bg-slate-900 border-b border-slate-800 p-4 z-10 flex justify-between items-center">
@@ -31,48 +59,70 @@
             <div id="currentDateDisplay" class="text-xs text-slate-400 font-medium mt-0.5">Today</div>
         </div>
         <div class="flex gap-3">
-            <button onclick="changeDate(-1)" class="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-300"><i class="fa-solid fa-chevron-left"></i></button>
-            <button onclick="changeDate(1)" class="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-300"><i class="fa-solid fa-chevron-right"></i></button>
-            <button onclick="openProfile()" class="w-8 h-8 rounded-full bg-emerald-900/50 text-emerald-400 flex items-center justify-center border border-emerald-800"><i class="fa-solid fa-user"></i></button>
+            <button onclick="changeDate(-1)"
+                class="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-300"><i
+                    class="fa-solid fa-chevron-left"></i></button>
+            <button onclick="changeDate(1)"
+                class="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-300"><i
+                    class="fa-solid fa-chevron-right"></i></button>
+            <button onclick="openProfile()"
+                class="w-8 h-8 rounded-full bg-emerald-900/50 text-emerald-400 flex items-center justify-center border border-emerald-800"><i
+                    class="fa-solid fa-user"></i></button>
         </div>
     </header>
 
     <main class="flex-1 overflow-y-auto p-4 pb-24 hide-scrollbar" id="main-view">
-        
+
         <!-- DASHBOARD VIEW -->
         <div id="view-dashboard">
             <div class="bg-slate-900 rounded-2xl p-5 mb-5 border border-slate-800 relative">
                 <!-- Button moved from here to inside the flex container below -->
 
                 <div class="flex items-center">
-                    <div class="relative w-28 h-28 rounded-full conic-gradient flex items-center justify-center shadow-2xl shadow-emerald-900/20" id="calCircle" style="--color: #34d399; --percent: 0%;">
-                        <div class="w-24 h-24 bg-slate-900 rounded-full flex flex-col items-center justify-center border-4 border-slate-900">
+                    <div class="relative w-28 h-28 rounded-full conic-gradient flex items-center justify-center shadow-2xl shadow-emerald-900/20"
+                        id="calCircle" style="--color: #34d399; --percent: 0%;">
+                        <div
+                            class="w-24 h-24 bg-slate-900 rounded-full flex flex-col items-center justify-center border-4 border-slate-900">
                             <span class="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Remaining</span>
                             <span class="text-2xl font-bold text-white" id="calRemaining">--</span>
                             <span class="text-[10px] text-slate-500">kcal</span>
                         </div>
+                        <div
+                            class="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-slate-800 px-2 py-0.5 rounded-full text-[9px] text-emerald-400 font-bold whitespace-nowrap">
+                            <span id="calEaten">0</span> eaten
+                        </div>
                     </div>
                     <div class="flex-1 ml-6 space-y-3">
                         <div class="space-y-1">
-                            <div class="flex justify-between text-xs text-slate-400"><span>Carbs</span><span id="carbVal">0/0g</span></div>
-                            <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden"><div id="carbBar" class="h-full bg-blue-500 w-0 transition-all duration-500"></div></div>
+                            <div class="flex justify-between text-xs text-slate-400"><span>Carbs</span><span
+                                    id="carbVal">0/0g</span></div>
+                            <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                <div id="carbBar" class="h-full bg-blue-500 w-0 transition-all duration-500"></div>
+                            </div>
                         </div>
                         <div class="space-y-1">
-                            <div class="flex justify-between text-xs text-slate-400"><span>Protein</span><span id="protVal">0/0g</span></div>
-                            <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden"><div id="protBar" class="h-full bg-red-500 w-0 transition-all duration-500"></div></div>
+                            <div class="flex justify-between text-xs text-slate-400"><span>Protein</span><span
+                                    id="protVal">0/0g</span></div>
+                            <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                <div id="protBar" class="h-full bg-red-500 w-0 transition-all duration-500"></div>
+                            </div>
                         </div>
                         <div class="space-y-1">
-                            <div class="flex justify-between text-xs text-slate-400"><span>Fat</span><span id="fatVal">0/0g</span></div>
-                            <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden"><div id="fatBar" class="h-full bg-yellow-500 w-0 transition-all duration-500"></div></div>
+                            <div class="flex justify-between text-xs text-slate-400"><span>Fat</span><span
+                                    id="fatVal">0/0g</span></div>
+                            <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                <div id="fatBar" class="h-full bg-yellow-500 w-0 transition-all duration-500"></div>
+                            </div>
                         </div>
-                        
+
                         <!-- NEW: Details Button + Cost Display -->
                         <div class="flex justify-between items-center pt-1 mt-2 border-t border-slate-800">
                             <div class="text-sm font-bold text-slate-300">
                                 <span class="text-[10px] text-slate-500 uppercase mr-1">Daily Cost</span>
                                 $<span id="dailyCost">0.00</span>
                             </div>
-                            <button onclick="openMicros()" class="text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-950/30 border border-emerald-900/50 px-2 py-1 rounded hover:bg-emerald-900/50 transition flex items-center gap-1">
+                            <button onclick="openMicros()"
+                                class="text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-950/30 border border-emerald-900/50 px-2 py-1 rounded hover:bg-emerald-900/50 transition flex items-center gap-1">
                                 <i class="fa-solid fa-vial"></i> Details
                             </button>
                         </div>
@@ -88,18 +138,20 @@
             <div class="flex-1 overflow-y-auto pb-4 space-y-4" id="coachChatArea">
                 <div class="bg-slate-900 p-4 rounded-xl border border-slate-800">
                     <p class="text-sm text-slate-300">
-                        👋 Hi! I'm your Nutrition Coach. I can analyze your food logs. 
-                        Try asking: 
+                        👋 Hi! I'm your Nutrition Coach. I can analyze your food logs.
+                        Try asking:
                         <br>• "How was my protein intake this week?"
                         <br>• "Am I lacking any vitamins?"
                         <br>• "Show me a chart of my calories for the last 7 days."
                     </p>
                 </div>
             </div>
-            
+
             <div class="mt-2 bg-slate-900 p-2 rounded-xl border border-slate-800 flex gap-2">
-                <input type="text" id="coachInput" placeholder="Ask about your nutrition..." class="flex-1 bg-transparent text-white p-2 outline-none text-sm">
-                <button onclick="askCoach()" class="bg-emerald-600 text-white p-2 rounded-lg w-10 h-10 flex items-center justify-center">
+                <input type="text" id="coachInput" placeholder="Ask about your nutrition..."
+                    class="flex-1 bg-transparent text-white p-2 outline-none text-sm">
+                <button onclick="askCoach()"
+                    class="bg-emerald-600 text-white p-2 rounded-lg w-10 h-10 flex items-center justify-center">
                     <i class="fa-solid fa-paper-plane"></i>
                 </button>
             </div>
@@ -107,15 +159,18 @@
 
     </main>
 
-    <button id="mainAddBtn" onclick="openAddModal()" class="absolute bottom-20 right-4 bg-emerald-500 text-white w-14 h-14 rounded-full shadow-lg shadow-emerald-500/30 flex items-center justify-center text-2xl z-20 active:scale-95 transition-transform">
+    <button id="mainAddBtn" onclick="openAddModal()"
+        class="absolute bottom-20 right-4 bg-emerald-500 text-white w-14 h-14 rounded-full shadow-lg shadow-emerald-500/30 flex items-center justify-center text-2xl z-20 active:scale-95 transition-transform">
         <i class="fa-solid fa-plus"></i>
     </button>
 
     <nav class="bg-slate-900 border-t border-slate-800 flex justify-around py-3 z-30 pb-safe">
-        <button id="nav-diary" class="nav-item active flex flex-col items-center text-[10px] gap-1 text-emerald-400" onclick="switchMainView('diary')">
+        <button id="nav-diary" class="nav-item active flex flex-col items-center text-[10px] gap-1 text-emerald-400"
+            onclick="switchMainView('diary')">
             <i class="fa-solid fa-book-open text-xl"></i> Diary
         </button>
-        <button id="nav-coach" class="nav-item flex flex-col items-center text-[10px] gap-1 text-slate-500" onclick="switchMainView('coach')">
+        <button id="nav-coach" class="nav-item flex flex-col items-center text-[10px] gap-1 text-slate-500"
+            onclick="switchMainView('coach')">
             <i class="fa-solid fa-user-doctor text-xl"></i> AI Coach
         </button>
         <button class="nav-item flex flex-col items-center text-[10px] gap-1 text-slate-500" onclick="openPlanner()">
@@ -126,37 +181,50 @@
         </button>
     </nav>
 
-    <div id="addModal" class="fixed inset-0 bg-slate-950 z-50 translate-y-full transition-transform duration-300 flex flex-col">
+    <div id="addModal"
+        class="fixed inset-0 bg-slate-950 z-50 translate-y-full transition-transform duration-300 flex flex-col">
         <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900">
-            <button onclick="closeAddModal()" class="text-slate-400 w-8"><i class="fa-solid fa-chevron-down text-xl"></i></button>
+            <button onclick="closeAddModal()" class="text-slate-400 w-8"><i
+                    class="fa-solid fa-chevron-down text-xl"></i></button>
             <div class="flex gap-4 text-sm font-medium overflow-x-auto hide-scrollbar">
-                <button onclick="setSearchMode('search')" id="tab-search" class="text-emerald-400 border-b-2 border-emerald-400 pb-1 whitespace-nowrap">Search</button>
-                <button onclick="setSearchMode('analyze')" id="tab-analyze" class="text-slate-400 pb-1 whitespace-nowrap">Analyze</button>
-                <button onclick="setSearchMode('create')" id="tab-create" class="text-slate-400 pb-1 whitespace-nowrap">Create</button>
-                <button onclick="setSearchMode('favs')" id="tab-favs" class="text-slate-400 pb-1 whitespace-nowrap">Favorites</button>
+                <button onclick="setSearchMode('search')" id="tab-search"
+                    class="text-emerald-400 border-b-2 border-emerald-400 pb-1 whitespace-nowrap">Search</button>
+                <button onclick="setSearchMode('analyze')" id="tab-analyze"
+                    class="text-slate-400 pb-1 whitespace-nowrap">Analyze</button>
+                <button onclick="setSearchMode('create')" id="tab-create"
+                    class="text-slate-400 pb-1 whitespace-nowrap">Create</button>
+                <button onclick="setSearchMode('favs')" id="tab-favs"
+                    class="text-slate-400 pb-1 whitespace-nowrap">Favorites</button>
             </div>
             <div class="w-8"></div>
         </div>
 
         <div id="view-search" class="flex flex-col flex-1 p-4">
-            <div id="scanner-container" class="mb-4 hidden rounded-lg overflow-hidden relative border border-slate-700 h-64 bg-black"></div>
-            
+            <div id="scanner-container"
+                class="mb-4 hidden rounded-lg overflow-hidden relative border border-slate-700 h-64 bg-black"></div>
+
             <div class="relative mb-4">
                 <i class="fa-solid fa-magnifying-glass absolute left-4 top-3.5 text-slate-500"></i>
-                <input type="text" id="searchInput" placeholder="Search (e.g., 'Big Mac' or 'Mivolis')" class="w-full bg-slate-800 text-white p-3 pl-10 rounded-xl border border-slate-700 focus:border-emerald-500 outline-none">
-                <button onclick="startScanner()" class="absolute right-3 top-2.5 text-slate-400 bg-slate-700 p-1.5 rounded-lg"><i class="fa-solid fa-barcode"></i></button>
+                <input type="text" id="searchInput" placeholder="Search (e.g., 'Big Mac' or 'Mivolis')"
+                    class="w-full bg-slate-800 text-white p-3 pl-10 rounded-xl border border-slate-700 focus:border-emerald-500 outline-none">
+                <button onclick="startScanner()"
+                    class="absolute right-3 top-2.5 text-slate-400 bg-slate-700 p-1.5 rounded-lg"><i
+                        class="fa-solid fa-barcode"></i></button>
             </div>
 
             <div class="grid grid-cols-2 gap-3 mb-3">
-                <button onclick="triggerVision('camera')" class="py-3 bg-slate-800 rounded-xl border border-slate-700 text-slate-300 text-sm font-medium flex items-center justify-center gap-2">
+                <button onclick="triggerVision('camera')"
+                    class="py-3 bg-slate-800 rounded-xl border border-slate-700 text-slate-300 text-sm font-medium flex items-center justify-center gap-2">
                     <i class="fa-solid fa-camera text-emerald-400"></i> Camera Scan
                 </button>
-                <button onclick="triggerVision('gallery')" class="py-3 bg-slate-800 rounded-xl border border-slate-700 text-slate-300 text-sm font-medium flex items-center justify-center gap-2">
+                <button onclick="triggerVision('gallery')"
+                    class="py-3 bg-slate-800 rounded-xl border border-slate-700 text-slate-300 text-sm font-medium flex items-center justify-center gap-2">
                     <i class="fa-solid fa-image text-blue-400"></i> Upload Pic
                 </button>
             </div>
-            
-            <button onclick="manualBarcode()" class="w-full py-3 bg-slate-900 rounded-xl border border-slate-800 text-slate-400 text-sm font-medium flex items-center justify-center gap-2 hover:text-white hover:border-slate-600 transition mb-4">
+
+            <button onclick="manualBarcode()"
+                class="w-full py-3 bg-slate-900 rounded-xl border border-slate-800 text-slate-400 text-sm font-medium flex items-center justify-center gap-2 hover:text-white hover:border-slate-600 transition mb-4">
                 <i class="fa-solid fa-keyboard"></i> Enter Barcode Manually
             </button>
 
@@ -169,104 +237,155 @@
         </div>
 
         <div id="view-analyze" class="hidden flex-col flex-1 p-4">
-             <p class="text-sm text-slate-400 mb-2">Enter recipe or ingredient list:</p>
-             <textarea id="analyzeInput" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white h-32 mb-3" placeholder="e.g. 1 cup rice, 100g chicken breast, 1 tsp oil"></textarea>
-             <button onclick="analyzeIngredients()" class="w-full py-3 bg-blue-600 rounded-xl font-bold mb-4">Analyze Nutrition</button>
-             <div id="analyzeResults" class="space-y-2 flex-1 overflow-y-auto pb-10"></div>
+            <p class="text-sm text-slate-400 mb-2">Enter recipe or ingredient list:</p>
+            <textarea id="analyzeInput"
+                class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white h-32 mb-3"
+                placeholder="e.g. 1 cup rice, 100g chicken breast, 1 tsp oil"></textarea>
+            <button onclick="analyzeIngredients()" class="w-full py-3 bg-blue-600 rounded-xl font-bold mb-4">Analyze
+                Nutrition</button>
+            <div id="analyzeResults" class="space-y-2 flex-1 overflow-y-auto pb-10"></div>
         </div>
 
         <div id="view-create" class="hidden flex-col flex-1 p-4 overflow-y-auto">
             <div class="space-y-3 pb-10">
-                <div><label class="text-xs text-slate-500">Name</label><input id="manName" class="input-dark" type="text" placeholder="Item Name"></div>
+                <div><label class="text-xs text-slate-500">Name</label><input id="manName" class="input-dark"
+                        type="text" placeholder="Item Name"></div>
                 <div class="grid grid-cols-2 gap-3">
-                     <div><label class="text-xs text-slate-500">Qty</label><input id="manQty" class="input-dark" type="number" value="100"></div>
-                     <div><label class="text-xs text-slate-500">Unit</label><input id="manUnit" class="input-dark" type="text" value="g"></div>
+                    <div><label class="text-xs text-slate-500">Qty</label><input id="manQty" class="input-dark"
+                            type="number" value="100"></div>
+                    <div><label class="text-xs text-slate-500">Unit</label><input id="manUnit" class="input-dark"
+                            type="text" value="g"></div>
                 </div>
                 <div class="grid grid-cols-4 gap-2">
-                     <div><label class="text-xs text-slate-500">Kcal</label><input id="manKcal" class="input-dark" type="number" placeholder="0"></div>
-                     <div><label class="text-xs text-slate-500">P</label><input id="manProt" class="input-dark" type="number" placeholder="0"></div>
-                     <div><label class="text-xs text-slate-500">C</label><input id="manCarb" class="input-dark" type="number" placeholder="0"></div>
-                     <div><label class="text-xs text-slate-500">F</label><input id="manFat" class="input-dark" type="number" placeholder="0"></div>
+                    <div><label class="text-xs text-slate-500">Kcal</label><input id="manKcal" class="input-dark"
+                            type="number" placeholder="0"></div>
+                    <div><label class="text-xs text-slate-500">P</label><input id="manProt" class="input-dark"
+                            type="number" placeholder="0"></div>
+                    <div><label class="text-xs text-slate-500">C</label><input id="manCarb" class="input-dark"
+                            type="number" placeholder="0"></div>
+                    <div><label class="text-xs text-slate-500">F</label><input id="manFat" class="input-dark"
+                            type="number" placeholder="0"></div>
                 </div>
-                
+
                 <div class="border-t border-slate-800 pt-3 mt-3">
                     <p class="text-sm font-bold text-slate-300 mb-2">Macro Details</p>
                     <div class="grid grid-cols-2 gap-3">
-                         <div><label class="text-[10px] text-slate-500">Sugars (g)</label><input id="man_sugars" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Fiber (g)</label><input id="man_fiber" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Sat. Fat (g)</label><input id="man_saturated_fat" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Mono. Fat (g)</label><input id="man_monounsaturated_fat" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Poly. Fat (g)</label><input id="man_polyunsaturated_fat" class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">Sugars (g)</label><input id="man_sugars"
+                                class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">Fiber (g)</label><input id="man_fiber"
+                                class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">Sat. Fat (g)</label><input id="man_saturated_fat"
+                                class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">Mono. Fat (g)</label><input
+                                id="man_monounsaturated_fat" class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">Poly. Fat (g)</label><input
+                                id="man_polyunsaturated_fat" class="input-dark" type="number"></div>
                     </div>
 
                     <p class="text-sm font-bold text-slate-300 mb-2 mt-4">Vitamins</p>
                     <div class="grid grid-cols-2 gap-3">
-                         <div><label class="text-[10px] text-slate-500">Vit A (µg)</label><input id="man_vitamin_a" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Vit C (mg)</label><input id="man_vitamin_c" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Vit D3 (µg)</label><input id="man_vitamin_d" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Vit E (mg)</label><input id="man_vitamin_e" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Vit K1 (µg)</label><input id="man_vitamin_k" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">B1 Thiamin (mg)</label><input id="man_thiamin" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">B2 Riboflavin (mg)</label><input id="man_riboflavin" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">B3 Niacin (mg)</label><input id="man_niacin" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">B5 Pantothenic (mg)</label><input id="man_pantothenic_acid" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">B6 Pyridoxine (mg)</label><input id="man_vitamin_b6" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">B7 Biotin (µg)</label><input id="man_biotin" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">B9 Folic Acid (µg)</label><input id="man_folic_acid" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">B12 Cobalamin (µg)</label><input id="man_vitamin_b12" class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">Vit A (µg)</label><input id="man_vitamin_a"
+                                class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">Vit C (mg)</label><input id="man_vitamin_c"
+                                class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">Vit D3 (µg)</label><input id="man_vitamin_d"
+                                class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">Vit E (mg)</label><input id="man_vitamin_e"
+                                class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">Vit K1 (µg)</label><input id="man_vitamin_k"
+                                class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">B1 Thiamin (mg)</label><input id="man_thiamin"
+                                class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">B2 Riboflavin (mg)</label><input
+                                id="man_riboflavin" class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">B3 Niacin (mg)</label><input id="man_niacin"
+                                class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">B5 Pantothenic (mg)</label><input
+                                id="man_pantothenic_acid" class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">B6 Pyridoxine (mg)</label><input
+                                id="man_vitamin_b6" class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">B7 Biotin (µg)</label><input id="man_biotin"
+                                class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">B9 Folic Acid (µg)</label><input
+                                id="man_folic_acid" class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">B12 Cobalamin (µg)</label><input
+                                id="man_vitamin_b12" class="input-dark" type="number"></div>
                     </div>
 
                     <p class="text-sm font-bold text-slate-300 mb-2 mt-4">Minerals & Electrolytes</p>
                     <div class="grid grid-cols-2 gap-3">
-                         <div><label class="text-[10px] text-slate-500">Sodium (mg)</label><input id="man_sodium" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Potassium (mg)</label><input id="man_potassium" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Calcium (mg)</label><input id="man_calcium" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Magnesium (mg)</label><input id="man_magnesium" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Zinc (mg)</label><input id="man_zinc" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Iron (mg)</label><input id="man_iron" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Phosphorus (mg)</label><input id="man_phosphorus" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Chloride (mg)</label><input id="man_chloride" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Iodine (µg)</label><input id="man_iodine" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Selenium (µg)</label><input id="man_selenium" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Copper (mg)</label><input id="man_copper" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Manganese (mg)</label><input id="man_manganese" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Chromium (µg)</label><input id="man_chromium" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Molybdenum (µg)</label><input id="man_molybdenum" class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">Sodium (mg)</label><input id="man_sodium"
+                                class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">Potassium (mg)</label><input id="man_potassium"
+                                class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">Calcium (mg)</label><input id="man_calcium"
+                                class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">Magnesium (mg)</label><input id="man_magnesium"
+                                class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">Zinc (mg)</label><input id="man_zinc"
+                                class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">Iron (mg)</label><input id="man_iron"
+                                class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">Phosphorus (mg)</label><input id="man_phosphorus"
+                                class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">Chloride (mg)</label><input id="man_chloride"
+                                class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">Iodine (µg)</label><input id="man_iodine"
+                                class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">Selenium (µg)</label><input id="man_selenium"
+                                class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">Copper (mg)</label><input id="man_copper"
+                                class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">Manganese (mg)</label><input id="man_manganese"
+                                class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">Chromium (µg)</label><input id="man_chromium"
+                                class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">Molybdenum (µg)</label><input id="man_molybdenum"
+                                class="input-dark" type="number"></div>
                     </div>
 
                     <p class="text-sm font-bold text-slate-300 mb-2 mt-4">Other</p>
                     <div class="grid grid-cols-2 gap-3">
-                         <div><label class="text-[10px] text-slate-500">Caffeine (mg)</label><input id="man_caffeine" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Water (g)</label><input id="man_water" class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">Caffeine (mg)</label><input id="man_caffeine"
+                                class="input-dark" type="number"></div>
+                        <div><label class="text-[10px] text-slate-500">Water (g)</label><input id="man_water"
+                                class="input-dark" type="number"></div>
                     </div>
                 </div>
 
-                <button onclick="saveManualItem()" class="w-full py-3 bg-emerald-600 rounded-xl font-bold mt-4">Add to Diary</button>
+                <button onclick="saveManualItem()" class="w-full py-3 bg-emerald-600 rounded-xl font-bold mt-4">Add to
+                    Diary</button>
             </div>
         </div>
 
-        <div id="view-favs" class="hidden flex-col flex-1 p-4">
+        <div id="view-favs" class="hidden flex-col flex-1 p-4 overflow-y-auto">
             <div id="favList" class="space-y-2"></div>
         </div>
     </div>
 
     <!-- UPDATED EDIT MODAL WITH COST CALCULATOR -->
-    <div id="editModal" class="fixed inset-0 bg-black/80 z-[60] hidden flex items-end justify-center backdrop-blur-sm overflow-y-auto">
-        <div class="bg-slate-900 w-full rounded-t-3xl p-6 border-t border-slate-700 shadow-2xl max-h-[90vh] overflow-y-auto">
+    <div id="editModal"
+        class="fixed inset-0 bg-black/80 z-[60] hidden flex items-end justify-center backdrop-blur-sm overflow-y-auto">
+        <div
+            class="bg-slate-900 w-full rounded-t-3xl p-6 border-t border-slate-700 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-start mb-4">
                 <div>
                     <h2 id="editName" class="text-xl font-bold text-white">Food Name</h2>
                     <div class="text-xs text-emerald-400 mt-1" id="editSource">Source: Database</div>
                 </div>
                 <div class="flex gap-2">
-                    <button id="btnDeleteLog" onclick="deleteLog()" class="bg-slate-800 w-8 h-8 rounded-full text-red-400 hidden"><i class="fa-solid fa-trash"></i></button>
-                    <button onclick="closeEditModal()" class="bg-slate-800 w-8 h-8 rounded-full text-slate-400"><i class="fa-solid fa-xmark"></i></button>
+                    <button id="btnDeleteLog" onclick="deleteLog()"
+                        class="bg-slate-800 w-8 h-8 rounded-full text-red-400 hidden"><i
+                            class="fa-solid fa-trash"></i></button>
+                    <button onclick="closeEditModal()" class="bg-slate-800 w-8 h-8 rounded-full text-slate-400"><i
+                            class="fa-solid fa-xmark"></i></button>
                 </div>
             </div>
 
             <div class="mb-4">
                 <label class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Meal</label>
-                <select id="editMeal" class="w-full bg-slate-800 text-white text-base p-3 rounded-xl mt-1 outline-none h-[46px] border border-slate-700">
+                <select id="editMeal"
+                    class="w-full bg-slate-800 text-white text-base p-3 rounded-xl mt-1 outline-none h-[46px] border border-slate-700">
                     <option value="Breakfast">Breakfast</option>
                     <option value="Lunch">Lunch</option>
                     <option value="Dinner">Dinner</option>
@@ -277,11 +396,14 @@
             <div class="flex gap-4 mb-6">
                 <div class="flex-1">
                     <label class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Quantity</label>
-                    <input type="number" id="editQty" class="w-full bg-slate-800 text-white text-2xl font-bold p-3 rounded-xl mt-1 focus:ring-1 ring-emerald-500 outline-none" value="100">
+                    <input type="number" id="editQty"
+                        class="w-full bg-slate-800 text-white text-2xl font-bold p-3 rounded-xl mt-1 focus:ring-1 ring-emerald-500 outline-none"
+                        value="100">
                 </div>
                 <div class="w-1/3">
                     <label class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Unit</label>
-                    <select id="editUnit" class="w-full bg-slate-800 text-white text-lg p-3 rounded-xl mt-1 outline-none h-[56px]">
+                    <select id="editUnit"
+                        class="w-full bg-slate-800 text-white text-lg p-3 rounded-xl mt-1 outline-none h-[56px]">
                         <option value="g">g</option>
                         <option value="ml">ml</option>
                         <option value="portion">srv</option>
@@ -292,19 +414,23 @@
             <div class="grid grid-cols-4 gap-2 mb-4">
                 <div class="bg-slate-800 rounded-lg p-2 text-center">
                     <div class="text-[10px] text-slate-500">Kcal</div>
-                    <input id="editKcal" type="number" class="w-full bg-transparent text-white font-bold text-center outline-none">
+                    <input id="editKcal" type="number"
+                        class="w-full bg-transparent text-white font-bold text-center outline-none">
                 </div>
                 <div class="bg-slate-800 rounded-lg p-2 text-center">
                     <div class="text-[10px] text-slate-500">Carbs</div>
-                    <input id="editCarbs" type="number" class="w-full bg-transparent text-blue-400 font-bold text-center outline-none">
+                    <input id="editCarbs" type="number"
+                        class="w-full bg-transparent text-blue-400 font-bold text-center outline-none">
                 </div>
                 <div class="bg-slate-800 rounded-lg p-2 text-center">
                     <div class="text-[10px] text-slate-500">Prot</div>
-                    <input id="editProt" type="number" class="w-full bg-transparent text-red-400 font-bold text-center outline-none">
+                    <input id="editProt" type="number"
+                        class="w-full bg-transparent text-red-400 font-bold text-center outline-none">
                 </div>
                 <div class="bg-slate-800 rounded-lg p-2 text-center">
                     <div class="text-[10px] text-slate-500">Fat</div>
-                    <input id="editFat" type="number" class="w-full bg-transparent text-yellow-400 font-bold text-center outline-none">
+                    <input id="editFat" type="number"
+                        class="w-full bg-transparent text-yellow-400 font-bold text-center outline-none">
                 </div>
             </div>
 
@@ -312,105 +438,159 @@
             <div class="bg-slate-800/50 rounded-xl p-3 border border-slate-700 mb-4">
                 <div class="flex justify-between items-center mb-2">
                     <label class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Total Cost ($)</label>
-                    <input type="number" step="0.01" id="editCost" class="bg-slate-900 text-emerald-400 font-bold text-right p-1 rounded border border-slate-700 w-24 outline-none focus:border-emerald-500" placeholder="0.00">
+                    <input type="number" step="0.01" id="editCost"
+                        class="bg-slate-900 text-emerald-400 font-bold text-right p-1 rounded border border-slate-700 w-24 outline-none focus:border-emerald-500"
+                        placeholder="0.00">
                 </div>
 
                 <!-- Collapsible Bulk Calculator -->
                 <details class="group">
-                    <summary class="text-[10px] text-slate-500 cursor-pointer hover:text-emerald-400 flex items-center gap-1 select-none">
+                    <summary
+                        class="text-[10px] text-slate-500 cursor-pointer hover:text-emerald-400 flex items-center gap-1 select-none">
                         <i class="fa-solid fa-calculator"></i> Calculate from Bulk / Package
                     </summary>
-                    <div class="grid grid-cols-2 gap-3 mt-3 pt-2 border-t border-slate-700/50 animate-in fade-in slide-in-from-top-1">
+                    <div
+                        class="grid grid-cols-2 gap-3 mt-3 pt-2 border-t border-slate-700/50 animate-in fade-in slide-in-from-top-1">
                         <div>
                             <label class="text-[10px] text-slate-500 block mb-1">Package Price ($)</label>
-                            <input type="number" step="0.01" id="editPkgPrice" class="w-full bg-slate-900 text-white text-xs p-2 rounded border border-slate-700 outline-none" placeholder="e.g. 5.00">
+                            <input type="number" step="0.01" id="editPkgPrice"
+                                class="w-full bg-slate-900 text-white text-xs p-2 rounded border border-slate-700 outline-none"
+                                placeholder="e.g. 5.00">
                         </div>
                         <div>
                             <label class="text-[10px] text-slate-500 block mb-1">Package Weight</label>
-                            <input type="number" id="editPkgWeight" class="w-full bg-slate-900 text-white text-xs p-2 rounded border border-slate-700 outline-none" placeholder="e.g. 1000">
+                            <input type="number" id="editPkgWeight"
+                                class="w-full bg-slate-900 text-white text-xs p-2 rounded border border-slate-700 outline-none"
+                                placeholder="e.g. 1000">
                         </div>
                     </div>
                 </details>
             </div>
 
-            <button onclick="document.getElementById('editMicrosArea').classList.toggle('hidden')" class="w-full py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-400 text-xs font-bold uppercase tracking-wide mb-4 hover:text-white transition">
+            <button onclick="document.getElementById('editMicrosArea').classList.toggle('hidden')"
+                class="w-full py-2 bg-slate-800 border border-slate-700 rounded-xl text-slate-400 text-xs font-bold uppercase tracking-wide mb-4 hover:text-white transition">
                 Show/Edit Details & Micros
             </button>
 
             <!-- COLLAPSIBLE EDIT AREA -->
             <div id="editMicrosArea" class="hidden border-t border-slate-800 pt-3 mb-4">
-                 <p class="text-sm font-bold text-slate-300 mb-2">Macro Details</p>
-                    <div class="grid grid-cols-2 gap-3">
-                         <div><label class="text-[10px] text-slate-500">Sugars (g)</label><input id="edit_sugars" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Fiber (g)</label><input id="edit_fiber" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Sat. Fat (g)</label><input id="edit_saturated_fat" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Mono. Fat (g)</label><input id="edit_monounsaturated_fat" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Poly. Fat (g)</label><input id="edit_polyunsaturated_fat" class="input-dark" type="number"></div>
-                    </div>
+                <p class="text-sm font-bold text-slate-300 mb-2">Macro Details</p>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="text-[10px] text-slate-500">Sugars (g)</label><input id="edit_sugars"
+                            class="input-dark" type="number"></div>
+                    <div><label class="text-[10px] text-slate-500">Fiber (g)</label><input id="edit_fiber"
+                            class="input-dark" type="number"></div>
+                    <div><label class="text-[10px] text-slate-500">Sat. Fat (g)</label><input id="edit_saturated_fat"
+                            class="input-dark" type="number"></div>
+                    <div><label class="text-[10px] text-slate-500">Mono. Fat (g)</label><input
+                            id="edit_monounsaturated_fat" class="input-dark" type="number"></div>
+                    <div><label class="text-[10px] text-slate-500">Poly. Fat (g)</label><input
+                            id="edit_polyunsaturated_fat" class="input-dark" type="number"></div>
+                </div>
 
-                    <p class="text-sm font-bold text-slate-300 mb-2 mt-4">Vitamins</p>
-                    <div class="grid grid-cols-2 gap-3">
-                         <div><label class="text-[10px] text-slate-500">Vit A (µg)</label><input id="edit_vitamin_a" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Vit C (mg)</label><input id="edit_vitamin_c" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Vit D3 (µg)</label><input id="edit_vitamin_d" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Vit E (mg)</label><input id="edit_vitamin_e" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Vit K1 (µg)</label><input id="edit_vitamin_k" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">B1 Thiamin (mg)</label><input id="edit_thiamin" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">B2 Riboflavin (mg)</label><input id="edit_riboflavin" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">B3 Niacin (mg)</label><input id="edit_niacin" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">B5 Pantothenic (mg)</label><input id="edit_pantothenic_acid" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">B6 Pyridoxine (mg)</label><input id="edit_vitamin_b6" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">B7 Biotin (µg)</label><input id="edit_biotin" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">B9 Folic Acid (µg)</label><input id="edit_folic_acid" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">B12 Cobalamin (µg)</label><input id="edit_vitamin_b12" class="input-dark" type="number"></div>
-                    </div>
+                <p class="text-sm font-bold text-slate-300 mb-2 mt-4">Vitamins</p>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="text-[10px] text-slate-500">Vit A (µg)</label><input id="edit_vitamin_a"
+                            class="input-dark" type="number"></div>
+                    <div><label class="text-[10px] text-slate-500">Vit C (mg)</label><input id="edit_vitamin_c"
+                            class="input-dark" type="number"></div>
+                    <div><label class="text-[10px] text-slate-500">Vit D3 (µg)</label><input id="edit_vitamin_d"
+                            class="input-dark" type="number"></div>
+                    <div><label class="text-[10px] text-slate-500">Vit E (mg)</label><input id="edit_vitamin_e"
+                            class="input-dark" type="number"></div>
+                    <div><label class="text-[10px] text-slate-500">Vit K1 (µg)</label><input id="edit_vitamin_k"
+                            class="input-dark" type="number"></div>
+                    <div><label class="text-[10px] text-slate-500">B1 Thiamin (mg)</label><input id="edit_thiamin"
+                            class="input-dark" type="number"></div>
+                    <div><label class="text-[10px] text-slate-500">B2 Riboflavin (mg)</label><input id="edit_riboflavin"
+                            class="input-dark" type="number"></div>
+                    <div><label class="text-[10px] text-slate-500">B3 Niacin (mg)</label><input id="edit_niacin"
+                            class="input-dark" type="number"></div>
+                    <div><label class="text-[10px] text-slate-500">B5 Pantothenic (mg)</label><input
+                            id="edit_pantothenic_acid" class="input-dark" type="number"></div>
+                    <div><label class="text-[10px] text-slate-500">B6 Pyridoxine (mg)</label><input id="edit_vitamin_b6"
+                            class="input-dark" type="number"></div>
+                    <div><label class="text-[10px] text-slate-500">B7 Biotin (µg)</label><input id="edit_biotin"
+                            class="input-dark" type="number"></div>
+                    <div><label class="text-[10px] text-slate-500">B9 Folic Acid (µg)</label><input id="edit_folic_acid"
+                            class="input-dark" type="number"></div>
+                    <div><label class="text-[10px] text-slate-500">B12 Cobalamin (µg)</label><input
+                            id="edit_vitamin_b12" class="input-dark" type="number"></div>
+                </div>
 
-                    <p class="text-sm font-bold text-slate-300 mb-2 mt-4">Minerals & Electrolytes</p>
-                    <div class="grid grid-cols-2 gap-3">
-                         <div><label class="text-[10px] text-slate-500">Sodium (mg)</label><input id="edit_sodium" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Potassium (mg)</label><input id="edit_potassium" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Calcium (mg)</label><input id="edit_calcium" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Magnesium (mg)</label><input id="edit_magnesium" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Zinc (mg)</label><input id="edit_zinc" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Iron (mg)</label><input id="edit_iron" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Phosphorus (mg)</label><input id="edit_phosphorus" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Chloride (mg)</label><input id="edit_chloride" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Iodine (µg)</label><input id="edit_iodine" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Selenium (µg)</label><input id="edit_selenium" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Copper (mg)</label><input id="edit_copper" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Manganese (mg)</label><input id="edit_manganese" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Chromium (µg)</label><input id="edit_chromium" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Molybdenum (µg)</label><input id="edit_molybdenum" class="input-dark" type="number"></div>
-                    </div>
+                <p class="text-sm font-bold text-slate-300 mb-2 mt-4">Minerals & Electrolytes</p>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="text-[10px] text-slate-500">Sodium (mg)</label><input id="edit_sodium"
+                            class="input-dark" type="number"></div>
+                    <div><label class="text-[10px] text-slate-500">Potassium (mg)</label><input id="edit_potassium"
+                            class="input-dark" type="number"></div>
+                    <div><label class="text-[10px] text-slate-500">Calcium (mg)</label><input id="edit_calcium"
+                            class="input-dark" type="number"></div>
+                    <div><label class="text-[10px] text-slate-500">Magnesium (mg)</label><input id="edit_magnesium"
+                            class="input-dark" type="number"></div>
+                    <div><label class="text-[10px] text-slate-500">Zinc (mg)</label><input id="edit_zinc"
+                            class="input-dark" type="number"></div>
+                    <div><label class="text-[10px] text-slate-500">Iron (mg)</label><input id="edit_iron"
+                            class="input-dark" type="number"></div>
+                    <div><label class="text-[10px] text-slate-500">Phosphorus (mg)</label><input id="edit_phosphorus"
+                            class="input-dark" type="number"></div>
+                    <div><label class="text-[10px] text-slate-500">Chloride (mg)</label><input id="edit_chloride"
+                            class="input-dark" type="number"></div>
+                    <div><label class="text-[10px] text-slate-500">Iodine (µg)</label><input id="edit_iodine"
+                            class="input-dark" type="number"></div>
+                    <div><label class="text-[10px] text-slate-500">Selenium (µg)</label><input id="edit_selenium"
+                            class="input-dark" type="number"></div>
+                    <div><label class="text-[10px] text-slate-500">Copper (mg)</label><input id="edit_copper"
+                            class="input-dark" type="number"></div>
+                    <div><label class="text-[10px] text-slate-500">Manganese (mg)</label><input id="edit_manganese"
+                            class="input-dark" type="number"></div>
+                    <div><label class="text-[10px] text-slate-500">Chromium (µg)</label><input id="edit_chromium"
+                            class="input-dark" type="number"></div>
+                    <div><label class="text-[10px] text-slate-500">Molybdenum (µg)</label><input id="edit_molybdenum"
+                            class="input-dark" type="number"></div>
+                </div>
 
-                    <p class="text-sm font-bold text-slate-300 mb-2 mt-4">Other</p>
-                    <div class="grid grid-cols-2 gap-3">
-                         <div><label class="text-[10px] text-slate-500">Caffeine (mg)</label><input id="edit_caffeine" class="input-dark" type="number"></div>
-                         <div><label class="text-[10px] text-slate-500">Water (g)</label><input id="edit_water" class="input-dark" type="number"></div>
-                    </div>
+                <p class="text-sm font-bold text-slate-300 mb-2 mt-4">Other</p>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="text-[10px] text-slate-500">Caffeine (mg)</label><input id="edit_caffeine"
+                            class="input-dark" type="number"></div>
+                    <div><label class="text-[10px] text-slate-500">Water (g)</label><input id="edit_water"
+                            class="input-dark" type="number"></div>
+                </div>
             </div>
-            
+
             <div class="flex gap-3">
-                <button id="addToFavBtn" class="p-4 bg-slate-800 text-slate-400 rounded-xl"><i class="fa-regular fa-heart"></i></button>
-                <button onclick="saveLog()" class="flex-1 bg-emerald-600 text-white rounded-xl font-bold text-lg shadow-lg shadow-emerald-900/50">Save Changes</button>
+                <button id="addToFavBtn" class="p-4 bg-slate-800 text-slate-400 rounded-xl"><i
+                        class="fa-regular fa-heart"></i></button>
+                <button onclick="saveLog()"
+                    class="flex-1 bg-emerald-600 text-white rounded-xl font-bold text-lg shadow-lg shadow-emerald-900/50">Save
+                    Changes</button>
             </div>
         </div>
     </div>
 
-    <div id="profileModal" class="fixed inset-0 bg-slate-950 z-50 translate-y-full transition-transform duration-300 overflow-y-auto">
+    <div id="profileModal"
+        class="fixed inset-0 bg-slate-950 z-50 translate-y-full transition-transform duration-300 overflow-y-auto">
         <div class="p-4">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-bold text-emerald-400">Profile & Goals</h2>
-                <button onclick="closeProfile()" class="text-slate-400"><i class="fa-solid fa-xmark text-2xl"></i></button>
+                <button onclick="closeProfile()" class="text-slate-400"><i
+                        class="fa-solid fa-xmark text-2xl"></i></button>
             </div>
 
             <div class="space-y-4 mb-6">
                 <div class="grid grid-cols-2 gap-4">
-                    <div><label class="text-xs text-slate-500">Weight (kg)</label><input type="number" id="pWeight" class="input-dark" value="70"></div>
-                    <div><label class="text-xs text-slate-500">Height (cm)</label><input type="number" id="pHeight" class="input-dark" value="175"></div>
-                    <div><label class="text-xs text-slate-500">Age</label><input type="number" id="pAge" class="input-dark" value="30"></div>
+                    <div><label class="text-xs text-slate-500">Weight (kg)</label><input type="number" id="pWeight"
+                            class="input-dark" value="70"></div>
+                    <div><label class="text-xs text-slate-500">Height (cm)</label><input type="number" id="pHeight"
+                            class="input-dark" value="175"></div>
+                    <div><label class="text-xs text-slate-500">Age</label><input type="number" id="pAge"
+                            class="input-dark" value="30"></div>
                     <div><label class="text-xs text-slate-500">Gender</label>
-                        <select id="pGender" class="input-dark"><option value="male">Male</option><option value="female">Female</option></select>
+                        <select id="pGender" class="input-dark">
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                        </select>
                     </div>
                 </div>
                 <div><label class="text-xs text-slate-500">Activity Level</label>
@@ -432,17 +612,24 @@
                 </div>
             </div>
 
-            <button onclick="calculateGoals()" class="w-full py-3 bg-blue-600 rounded-xl font-bold mb-6">Auto Calculate Goals</button>
+            <button onclick="calculateGoals()" class="w-full py-3 bg-blue-600 rounded-xl font-bold mb-6">Auto Calculate
+                Goals</button>
 
             <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 mb-6">
                 <h3 class="font-bold mb-3 text-emerald-400">Manual Goals (Override)</h3>
                 <div class="grid grid-cols-2 gap-3">
-                    <div><label class="text-xs text-slate-500">Daily Kcal</label><input type="number" id="manualKcal" class="input-dark" placeholder="Auto"></div>
-                    <div><label class="text-xs text-slate-500">Protein (g)</label><input type="number" id="manualProt" class="input-dark" placeholder="Auto"></div>
-                    <div><label class="text-xs text-slate-500">Carbs (g)</label><input type="number" id="manualCarb" class="input-dark" placeholder="Auto"></div>
-                    <div><label class="text-xs text-slate-500">Fat (g)</label><input type="number" id="manualFat" class="input-dark" placeholder="Auto"></div>
+                    <div><label class="text-xs text-slate-500">Daily Kcal</label><input type="number" id="manualKcal"
+                            class="input-dark" placeholder="Auto"></div>
+                    <div><label class="text-xs text-slate-500">Protein (g)</label><input type="number" id="manualProt"
+                            class="input-dark" placeholder="Auto"></div>
+                    <div><label class="text-xs text-slate-500">Carbs (g)</label><input type="number" id="manualCarb"
+                            class="input-dark" placeholder="Auto"></div>
+                    <div><label class="text-xs text-slate-500">Fat (g)</label><input type="number" id="manualFat"
+                            class="input-dark" placeholder="Auto"></div>
                 </div>
-                <button onclick="saveManualGoals()" class="w-full py-2 bg-emerald-900/50 text-emerald-400 border border-emerald-800 rounded-lg mt-3 text-sm font-bold">Save Manual Goals</button>
+                <button onclick="saveManualGoals()"
+                    class="w-full py-2 bg-emerald-900/50 text-emerald-400 border border-emerald-800 rounded-lg mt-3 text-sm font-bold">Save
+                    Manual Goals</button>
             </div>
         </div>
     </div>
@@ -451,22 +638,27 @@
         <div class="bg-slate-900 w-full max-w-sm rounded-2xl p-6 border border-slate-700 h-[80vh] flex flex-col">
             <div class="flex justify-between mb-4 shrink-0">
                 <h3 class="text-lg font-bold">Nutrient Breakdown</h3>
-                <button onclick="document.getElementById('microsModal').classList.add('hidden')"><i class="fa-solid fa-xmark"></i></button>
+                <button onclick="document.getElementById('microsModal').classList.add('hidden')"><i
+                        class="fa-solid fa-xmark"></i></button>
             </div>
             <div id="microList" class="space-y-2 text-sm overflow-y-auto flex-1 pr-2"></div>
             <div class="text-[10px] text-slate-500 mt-4 text-center shrink-0">*Values are estimates.</div>
         </div>
     </div>
 
-    <div id="plannerModal" class="fixed inset-0 bg-slate-950 z-50 translate-y-full transition-transform duration-300 overflow-y-auto p-4">
+    <div id="plannerModal"
+        class="fixed inset-0 bg-slate-950 z-50 translate-y-full transition-transform duration-300 overflow-y-auto p-4">
         <div class="flex justify-between items-center mb-4">
             <h2 class="text-xl font-bold text-emerald-400">AI Meal Planner</h2>
             <button onclick="closePlanner()" class="text-slate-400"><i class="fa-solid fa-xmark text-2xl"></i></button>
         </div>
         <p class="text-sm text-slate-400 mb-2">Enter ingredients you have:</p>
-        <textarea id="plannerInput" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white h-24 mb-3" placeholder="e.g. Chicken breast, broccoli, rice, soy sauce..."></textarea>
-        <button onclick="generateMealPlan()" class="w-full py-3 bg-blue-600 rounded-xl font-bold mb-6">Generate Meal Idea</button>
-        
+        <textarea id="plannerInput"
+            class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white h-24 mb-3"
+            placeholder="e.g. Chicken breast, broccoli, rice, soy sauce..."></textarea>
+        <button onclick="generateMealPlan()" class="w-full py-3 bg-blue-600 rounded-xl font-bold mb-6">Generate Meal
+            Idea</button>
+
         <div id="plannerResult" class="hidden bg-slate-900 p-4 rounded-xl border border-slate-800">
             <h3 id="planTitle" class="font-bold text-lg mb-2 text-white"></h3>
             <p id="planRecipe" class="text-sm text-slate-300 mb-4 whitespace-pre-wrap"></p>
@@ -477,9 +669,21 @@
         </div>
     </div>
 
-    <input type="file" id="visionCam" accept="image/*" capture="environment" class="hidden" onchange="handleVision(this)">
+    <input type="file" id="visionCam" accept="image/*" capture="environment" class="hidden"
+        onchange="handleVision(this)">
     <input type="file" id="visionGal" accept="image/*" class="hidden" onchange="handleVision(this)">
 
     <script src="/app.js"></script>
+    <script>
+        // Register Service Worker for PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then(reg => console.log('Service Worker registered:', reg.scope))
+                    .catch(err => console.error('Service Worker registration failed:', err));
+            });
+        }
+    </script>
 </body>
+
 </html>
