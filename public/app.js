@@ -154,31 +154,86 @@ function renderDashboard() {
     const costEl = document.getElementById('dailyCost');
     if (costEl) costEl.innerText = totalCost.toFixed(2);
 
-    const totals = dayLogs.reduce((acc, curr) => ({
+    // Sum what's been eaten
+    const eaten = dayLogs.reduce((acc, curr) => ({
         kcal: acc.kcal + (curr.calories || 0),
         p: acc.p + (curr.protein || 0),
         c: acc.c + (curr.carbs || 0),
         f: acc.f + (curr.fat || 0)
     }), { kcal: 0, p: 0, c: 0, f: 0 });
 
-    const remaining = Math.round(state.user.kcal - totals.kcal);
-    const percent = Math.min((totals.kcal / state.user.kcal) * 100, 100);
-    const eaten = Math.round(totals.kcal);
+    // --- DYNAMIC MACRO FLOORS ---
+    const weight = state.user.weight || 70;
+    const totalKcal = state.user.kcal || 2300;
+
+    // Floors: Protein = 2g/kg, Fat = 28% of kcal
+    const proteinFloor = Math.round(weight * 2);
+    const fatFloor = Math.round((totalKcal * 0.28) / 9);
+
+    // Calculate remaining calories after accounting for what's been eaten
+    const proteinCalUsed = eaten.p * 4;
+    const fatCalUsed = eaten.f * 9;
+    const carbCalUsed = eaten.c * 4;
+    const totalCalUsed = eaten.kcal;
+
+    const remainingKcal = totalKcal - totalCalUsed;
+
+    // --- DYNAMIC FLEX CALCULATION ---
+    // Calculate how much of each floor is still needed
+    const proteinNeeded = Math.max(0, proteinFloor - eaten.p);
+    const fatNeeded = Math.max(0, fatFloor - eaten.f);
+
+    // Calories reserved for unfulfilled floors
+    const reservedForProtein = proteinNeeded * 4;
+    const reservedForFat = fatNeeded * 9;
+
+    // Flex calories = remaining - what's reserved for unfulfilled floors
+    const flexCalories = Math.max(0, remainingKcal - reservedForProtein - reservedForFat);
+
+    // Carb floor is dynamic: remaining after protein & fat floors
+    const carbFloor = Math.round((totalKcal - (proteinFloor * 4) - (fatFloor * 9)) / 4);
+
+    // Calculate flex max for each macro (if you wanted to spend all flex on one macro)
+    const proteinFlexMax = Math.round(eaten.p + proteinNeeded + (flexCalories / 4));
+    const fatFlexMax = Math.round(eaten.f + fatNeeded + (flexCalories / 9));
+    const carbFlexMax = Math.round(eaten.c + (flexCalories / 4) + (reservedForProtein / 4) + (reservedForFat / 4));
+
+    // --- UPDATE CALORIE CIRCLE ---
+    const remaining = Math.round(remainingKcal);
+    const percent = Math.min((eaten.kcal / totalKcal) * 100, 100);
 
     document.getElementById('calRemaining').innerText = remaining;
-    document.getElementById('calEaten').innerText = eaten;
+    document.getElementById('calEaten').innerText = Math.round(eaten.kcal);
     document.getElementById('calCircle').style.setProperty('--percent', `${percent}%`);
     document.getElementById('calCircle').style.setProperty('--color', remaining < 0 ? '#ef4444' : '#34d399');
 
-    updateBar('carb', totals.c, state.user.c);
-    updateBar('prot', totals.p, state.user.p);
-    updateBar('fat', totals.f, state.user.f);
+    // --- UPDATE MACRO BARS WITH DYNAMIC INFO ---
+    updateDynamicBar('prot', eaten.p, proteinFloor, proteinFlexMax, '#ef4444');
+    updateDynamicBar('fat', eaten.f, fatFloor, fatFlexMax, '#eab308');
+    updateDynamicBar('carb', eaten.c, carbFloor, carbFlexMax, '#3b82f6');
 }
 
-function updateBar(type, val, max) {
-    const pct = Math.min((val / max) * 100, 100);
-    document.getElementById(`${type}Val`).innerText = `${Math.round(val)}/${Math.round(max)}g`;
-    document.getElementById(`${type}Bar`).style.width = `${pct}%`;
+function updateDynamicBar(type, current, floor, flexMax, color) {
+    const valEl = document.getElementById(`${type}Val`);
+    const barEl = document.getElementById(`${type}Bar`);
+
+    const floorMet = current >= floor;
+    const pct = Math.min((current / floor) * 100, 100);
+
+    // Show: "150g ✓ / 140" or "80g / 140 (→200)"
+    let displayText;
+    if (floorMet) {
+        // Floor met - show checkmark and flex max
+        displayText = `${Math.round(current)}g ✓ (max ${Math.round(flexMax)})`;
+        barEl.style.backgroundColor = '#34d399'; // Green when floor met
+    } else {
+        // Floor not met - show progress toward floor
+        displayText = `${Math.round(current)}/${Math.round(floor)}g`;
+        barEl.style.backgroundColor = color; // Original color
+    }
+
+    valEl.innerText = displayText;
+    barEl.style.width = `${pct}%`;
 }
 
 // --- GOAL CALCULATOR & PROFILE ---
