@@ -15,8 +15,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
-const upload = multer({ dest: 'uploads/' });
 const PORT = process.env.PORT || 3000;
+
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+}
+const upload = multer({ dest: uploadsDir });
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
@@ -29,7 +35,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 // --- HELPER: Extract Micros (With Unit Conversion) ---
 function extractMicros(n) {
     if (!n) return {};
-    
+
     // Helper to safely get value. OFF API returns nutrients in GRAMS (g).
     // We must convert to mg (x1000) or µg (x1,000,000).
     const get = (key) => n[key] || 0;
@@ -41,7 +47,7 @@ function extractMicros(n) {
         saturated_fat: get('saturated-fat_100g') || get('saturated-fat_value'),
         monounsaturated_fat: get('monounsaturated-fat_100g') || get('monounsaturated-fat_value'),
         polyunsaturated_fat: get('polyunsaturated-fat_100g') || get('polyunsaturated-fat_value'),
-        
+
         // --- Minerals/Electrolytes (Convert g -> mg) ---
         // Target: Milligrams (mg)
         sodium: (get('sodium_100g') || get('sodium_value')) * 1000,
@@ -54,7 +60,7 @@ function extractMicros(n) {
         iron: (get('iron_100g') || get('iron_value')) * 1000,
         copper: (get('copper_100g') || 0) * 1000,
         manganese: (get('manganese_100g') || 0) * 1000,
-        
+
         // --- Trace Minerals (Convert g -> µg) ---
         // Target: Micrograms (µg)
         iodine: (get('iodine_100g') || 0) * 1e6,
@@ -83,7 +89,7 @@ function extractMicros(n) {
         // --- Other ---
         // Caffeine is usually tracked in mg. OFF uses g.
         caffeine: (get('caffeine_100g') || get('caffeine_value')) * 1000,
-        
+
         // Water stays in grams
         water: get('water_100g') || get('water_value')
     };
@@ -99,7 +105,7 @@ app.post('/api/search', async (req, res) => {
         let url;
         // Limit fields to improve speed
         const fields = 'product_name,product_name_de,brands,nutriments,code,_id';
-        
+
         if (mode === 'barcode') {
             url = `https://world.openfoodfacts.org/api/v2/product/${query}.json?fields=${fields}`;
         } else {
@@ -129,7 +135,7 @@ app.post('/api/search', async (req, res) => {
                 carbs: p.nutriments?.carbohydrates || 0,
                 fat: p.nutriments?.fat || 0,
                 micros: extractMicros(p.nutriments),
-                unit: 'g', 
+                unit: 'g',
                 base_qty: 100,
                 source: 'OpenFoodFacts'
             }));
@@ -152,13 +158,17 @@ app.post('/api/search', async (req, res) => {
             messages: [{
                 role: "user",
                 content: `User searched for "${query}". It was not found in the German food database. 
-                Return a JSON object for 1 standard serving (or 100g if generic).
+                Return a JSON object for 100g of this food.
                 Include name, calories, protein, carbs, fat.
-                Also estimate these micros (mg/ug/g where appropriate): 
-                [sugars, fiber, saturated_fat, monounsaturated_fat, polyunsaturated_fat, sodium, potassium, chloride, water, caffeine]
-                AND [vitamin_a, thiamin, riboflavin, vitamin_b6, vitamin_b12, biotin, folic_acid, niacin, pantothenic_acid, vitamin_c, vitamin_d, vitamin_e, vitamin_k, calcium, magnesium, zinc, chromium, molybdenum, iodine, selenium, phosphorus, manganese, iron, copper].
-                Response format: { "name":Str, "base_qty":Num, "unit":Str, "calories":Num, "protein":Num, "carbs":Num, "fat":Num, "micros":{...} }
-                Strict JSON only.`
+                
+                Also include a "micros" object with these nutrients in EXACT units specified:
+                
+                IN GRAMS (g): sugars, fiber, saturated_fat, monounsaturated_fat, polyunsaturated_fat, water
+                IN MILLIGRAMS (mg): sodium, potassium, chloride, calcium, magnesium, zinc, iron, phosphorus, copper, manganese, thiamin, riboflavin, niacin, vitamin_b6, pantothenic_acid, vitamin_c, vitamin_e, caffeine
+                IN MICROGRAMS (µg): vitamin_a, vitamin_d, vitamin_k, vitamin_b12, biotin, folic_acid, chromium, molybdenum, iodine, selenium
+                
+                Response format: { "name":Str, "base_qty":100, "unit":"g", "calories":Num, "protein":Num, "carbs":Num, "fat":Num, "micros":{...} }
+                All values must be for 100g. Strict JSON only.`
             }]
         });
 
@@ -209,7 +219,7 @@ app.post('/api/plan-meal', async (req, res) => {
         const completion = await openai.chat.completions.create({
             model: "gpt-4o-mini",
             messages: [{
-                role: "system", 
+                role: "system",
                 content: "You are a meal planner. Create a meal using the provided ingredients. Return strictly JSON."
             }, {
                 role: "user",
@@ -230,7 +240,7 @@ app.post('/api/vision', upload.single('image'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No image' });
         const base64 = fs.readFileSync(req.file.path).toString('base64');
-        
+
         const response = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
             messages: [{
@@ -255,25 +265,51 @@ app.post('/api/vision', upload.single('image'), async (req, res) => {
 // --- API: AI Coach ---
 app.post('/api/coach', async (req, res) => {
     const { query, logs, user } = req.body;
-    
+
     // Limit logs to last 100
-    const recentLogs = logs.slice(-100); 
+    const recentLogs = logs.slice(-100);
+
+    // Pre-process logs for better AI understanding
+    const processedLogs = recentLogs.map(log => ({
+        date: log.date,
+        meal: log.meal,
+        name: log.name,
+        qty: log.qty,
+        unit: log.unit,
+        calories: Math.round(log.calories || 0),
+        protein: Math.round((log.protein || 0) * 10) / 10,
+        carbs: Math.round((log.carbs || 0) * 10) / 10,
+        fat: Math.round((log.fat || 0) * 10) / 10,
+        // Include key micros if available
+        ...(log.micros && {
+            sugars: log.micros.sugars,
+            fiber: log.micros.fiber,
+            sodium: log.micros.sodium,
+            water: log.micros.water,
+            caffeine: log.micros.caffeine
+        })
+    }));
 
     try {
         const completion = await openai.chat.completions.create({
             model: "gpt-4o-mini",
             messages: [{
-                role: "system", 
+                role: "system",
                 content: `You are an expert Nutrition Coach. Analyze the user's food logs and profile to answer their question.
                 
                 You have access to:
-                1. User Profile (Goals, Weight, etc)
-                2. Food Logs (Date, Name, Calories, Macros, Micros)
-
-                INSTRUCTIONS:
-                - Answer the user's question directly and helpfully.
-                - Identify lacking nutrients or excesses if asked.
-                - If the user asks for a graph/chart, or if a visual comparison would be very helpful, provide graph data.
+                1. User Profile: Daily goals (kcal, protein g, carbs g, fat g), weight, height, age, gender
+                2. Food Logs: Each entry has date, meal (Breakfast/Lunch/Dinner/Snacks), name, quantity, unit, calories, protein, carbs, fat, and some micros
+                
+                IMPORTANT INSTRUCTIONS:
+                - Calculate totals accurately by summing the values in the logs
+                - A "log" or "entry" is a single food item eaten, not a day or meal
+                - When asked about "items logged" or "foods logged", count the number of log entries
+                - When asked about specific days, filter logs by that date (format: YYYY-MM-DD)
+                - Calories are PRE-CALCULATED for the logged quantity - do NOT multiply by qty again
+                - Be precise with numbers - the user trusts your calculations
+                - If data seems incomplete or missing, acknowledge this
+                - If the user asks for a graph/chart, provide graph data in the format below
                 
                 RESPONSE FORMAT (Strict JSON):
                 {
@@ -291,12 +327,13 @@ app.post('/api/coach', async (req, res) => {
                 }
                 
                 Return 'graphs': [] if no graph is needed.
-                Use specific hex colors for consistency: Calories #10b981, Protein #ef4444, Carbs #3b82f6, Fat #eab308.
+                Use specific hex colors: Calories #10b981, Protein #ef4444, Carbs #3b82f6, Fat #eab308.
                 `
             }, {
                 role: "user",
                 content: `User Profile: ${JSON.stringify(user)}.
-                Recent Logs: ${JSON.stringify(recentLogs)}.
+                
+                Food Logs (${processedLogs.length} entries): ${JSON.stringify(processedLogs)}.
                 
                 User Query: "${query}"`
             }]
