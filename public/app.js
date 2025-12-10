@@ -1,9 +1,9 @@
 // --- STATE ---
 const state = {
     logs: JSON.parse(localStorage.getItem('foodlog_logs')) || [],
-    user: JSON.parse(localStorage.getItem('foodlog_user')) || { 
+    user: JSON.parse(localStorage.getItem('foodlog_user')) || {
         weight: 70, height: 175, age: 30, gender: 'male', activity: 1.375, goal: 0,
-        kcal: 2000, p: 150, c: 250, f: 70 
+        kcal: 2000, p: 150, c: 250, f: 70
     },
     favorites: JSON.parse(localStorage.getItem('foodlog_favs')) || [],
     currentDate: new Date().toISOString().split('T')[0],
@@ -19,12 +19,12 @@ const MICRO_KEYS = [
     // Macro Details
     'sugars', 'fiber', 'saturated_fat', 'monounsaturated_fat', 'polyunsaturated_fat',
     // Minerals / Electrolytes
-    'sodium', 'potassium', 'chloride', 'calcium', 'magnesium', 'zinc', 
+    'sodium', 'potassium', 'chloride', 'calcium', 'magnesium', 'zinc',
     'chromium', 'molybdenum', 'iodine', 'selenium', 'phosphorus', 'manganese', 'iron', 'copper',
     // Vitamins
     'vitamin_a', 'thiamin', 'riboflavin', 'vitamin_b6', 'vitamin_b12',
     'biotin', 'folic_acid', 'niacin', 'pantothenic_acid', 'vitamin_c',
-    'vitamin_d', 'vitamin_e', 'vitamin_k', 
+    'vitamin_d', 'vitamin_e', 'vitamin_k',
     // Other
     'caffeine', 'water'
 ];
@@ -75,18 +75,18 @@ function init() {
 }
 
 // --- NAVIGATION ---
-window.switchMainView = function(view) {
+window.switchMainView = function (view) {
     state.mainView = view;
-    
+
     // UI Toggles
     document.getElementById('view-dashboard').classList.toggle('hidden', view !== 'diary');
     document.getElementById('view-coach').classList.toggle('hidden', view !== 'coach');
-    document.getElementById('view-coach').classList.toggle('flex', view === 'coach'); 
-    
+    document.getElementById('view-coach').classList.toggle('flex', view === 'coach');
+
     // Nav Active State
     document.getElementById('nav-diary').classList.toggle('text-emerald-400', view === 'diary');
     document.getElementById('nav-diary').classList.toggle('text-slate-500', view !== 'diary');
-    
+
     document.getElementById('nav-coach').classList.toggle('text-emerald-400', view === 'coach');
     document.getElementById('nav-coach').classList.toggle('text-slate-500', view !== 'coach');
 
@@ -119,7 +119,7 @@ function renderMeals() {
                 <div class="space-y-3">
         `;
 
-        if(mealLogs.length === 0) {
+        if (mealLogs.length === 0) {
             html += `<div class="text-xs text-slate-600 italic py-2">No food logged</div>`;
         } else {
             mealLogs.forEach(log => {
@@ -148,11 +148,11 @@ function renderMeals() {
 
 function renderDashboard() {
     const dayLogs = state.logs.filter(l => l.date === state.currentDate);
-    
-    // NEW: Calculate Total Cost
+
+    // Calculate Total Cost
     const totalCost = dayLogs.reduce((sum, log) => sum + (log.cost || 0), 0);
     const costEl = document.getElementById('dailyCost');
-    if(costEl) costEl.innerText = totalCost.toFixed(2);
+    if (costEl) costEl.innerText = totalCost.toFixed(2);
 
     const totals = dayLogs.reduce((acc, curr) => ({
         kcal: acc.kcal + (curr.calories || 0),
@@ -163,8 +163,10 @@ function renderDashboard() {
 
     const remaining = Math.round(state.user.kcal - totals.kcal);
     const percent = Math.min((totals.kcal / state.user.kcal) * 100, 100);
-    
+    const eaten = Math.round(totals.kcal);
+
     document.getElementById('calRemaining').innerText = remaining;
+    document.getElementById('calEaten').innerText = eaten;
     document.getElementById('calCircle').style.setProperty('--percent', `${percent}%`);
     document.getElementById('calCircle').style.setProperty('--color', remaining < 0 ? '#ef4444' : '#34d399');
 
@@ -184,16 +186,16 @@ function renderProfileValues() {
     ['Weight', 'Height', 'Age', 'Gender', 'Activity', 'Goal'].forEach(k => {
         const key = k.toLowerCase();
         const el = document.getElementById(`p${k}`);
-        if(el && state.user[key]) el.value = state.user[key];
+        if (el && state.user[key]) el.value = state.user[key];
     });
 
-    if(state.user.manualKcal) document.getElementById('manualKcal').value = state.user.manualKcal;
-    if(state.user.manualProt) document.getElementById('manualProt').value = state.user.manualProt;
-    if(state.user.manualCarb) document.getElementById('manualCarb').value = state.user.manualCarb;
-    if(state.user.manualFat) document.getElementById('manualFat').value = state.user.manualFat;
+    if (state.user.manualKcal) document.getElementById('manualKcal').value = state.user.manualKcal;
+    if (state.user.manualProt) document.getElementById('manualProt').value = state.user.manualProt;
+    if (state.user.manualCarb) document.getElementById('manualCarb').value = state.user.manualCarb;
+    if (state.user.manualFat) document.getElementById('manualFat').value = state.user.manualFat;
 }
 
-window.calculateGoals = function() {
+window.calculateGoals = function () {
     const w = parseFloat(document.getElementById('pWeight').value);
     const h = parseFloat(document.getElementById('pHeight').value);
     const a = parseFloat(document.getElementById('pAge').value);
@@ -211,26 +213,26 @@ window.calculateGoals = function() {
     const c = (targetKcal * 0.35) / 4;
     const f = (targetKcal * 0.35) / 9;
 
-    state.user = { 
-        weight: w, height: h, age: a, gender: g, activity: act, goal: goalOffset, 
+    state.user = {
+        weight: w, height: h, age: a, gender: g, activity: act, goal: goalOffset,
         kcal: targetKcal, p, c, f,
         manualKcal: null, manualProt: null, manualCarb: null, manualFat: null
     };
-    
+
     saveUserAndRefresh();
     alert("Goals automatically calculated!");
 };
 
-window.saveManualGoals = function() {
+window.saveManualGoals = function () {
     const mKcal = parseFloat(document.getElementById('manualKcal').value);
     const mProt = parseFloat(document.getElementById('manualProt').value);
     const mCarb = parseFloat(document.getElementById('manualCarb').value);
     const mFat = parseFloat(document.getElementById('manualFat').value);
 
-    if(mKcal) state.user.kcal = mKcal;
-    if(mProt) state.user.p = mProt;
-    if(mCarb) state.user.c = mCarb;
-    if(mFat) state.user.f = mFat;
+    if (mKcal) state.user.kcal = mKcal;
+    if (mProt) state.user.p = mProt;
+    if (mCarb) state.user.c = mCarb;
+    if (mFat) state.user.f = mFat;
 
     state.user.manualKcal = mKcal;
     state.user.manualProt = mProt;
@@ -249,13 +251,13 @@ function saveUserAndRefresh() {
 }
 
 // --- ADD / SEARCH / ANALYZE / CREATE / FAVORITES ---
-window.openAddModal = function(meal) {
-    if(meal) state.selectedMeal = meal;
+window.openAddModal = function (meal) {
+    if (meal) state.selectedMeal = meal;
     document.getElementById('addModal').classList.remove('translate-y-full');
     setSearchMode('search');
 };
 
-window.setSearchMode = function(mode) {
+window.setSearchMode = function (mode) {
     // Stop scanner if leaving search tab
     if (state.activeTab === 'search' && mode !== 'search') {
         stopScanner();
@@ -266,7 +268,7 @@ window.setSearchMode = function(mode) {
     views.forEach(v => {
         const el = document.getElementById(`view-${v}`);
         const tab = document.getElementById(`tab-${v}`);
-        if(v === mode) {
+        if (v === mode) {
             el.classList.remove('hidden');
             el.classList.add('flex');
             tab.className = "text-emerald-400 border-b-2 border-emerald-400 pb-1 whitespace-nowrap";
@@ -276,8 +278,8 @@ window.setSearchMode = function(mode) {
             tab.className = "text-slate-400 pb-1 whitespace-nowrap";
         }
     });
-    if(mode === 'search') setTimeout(() => document.getElementById('searchInput').focus(), 100);
-    if(mode === 'favs') renderFavorites();
+    if (mode === 'search') setTimeout(() => document.getElementById('searchInput').focus(), 100);
+    if (mode === 'favs') renderFavorites();
 };
 
 // Search Logic
@@ -288,19 +290,19 @@ document.getElementById('searchInput').addEventListener('input', (e) => {
 });
 
 async function performSearch(query) {
-    if(query.length < 2) return;
+    if (query.length < 2) return;
     const resDiv = document.getElementById('searchResults');
     resDiv.innerHTML = '<div class="text-center mt-4"><i class="fa-solid fa-spinner fa-spin text-emerald-500"></i> searching database...</div>';
-    
+
     try {
         const res = await fetch('/api/search', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ query, mode: 'text' })
         });
         const data = await res.json();
-        
-        if(!data || data.error || data.length === 0) {
+
+        if (!data || data.error || data.length === 0) {
             resDiv.innerHTML = '<div class="text-center text-slate-500">No results found.</div>';
         } else {
             window.lastSearchResults = data;
@@ -321,9 +323,9 @@ async function performSearch(query) {
 }
 
 // --- ANALYZE INGREDIENTS ---
-window.analyzeIngredients = async function() {
+window.analyzeIngredients = async function () {
     const input = document.getElementById('analyzeInput').value;
-    if(!input) return alert("Please enter ingredients");
+    if (!input) return alert("Please enter ingredients");
 
     const resDiv = document.getElementById('analyzeResults');
     resDiv.innerHTML = '<div class="text-center mt-4"><i class="fa-solid fa-spinner fa-spin text-emerald-500"></i> analyzing...</div>';
@@ -331,13 +333,13 @@ window.analyzeIngredients = async function() {
     try {
         const res = await fetch('/api/analyze', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: input })
         });
         const data = await res.json();
 
-        if(data.error) throw new Error(data.error);
-        if(!data.items || data.items.length === 0) throw new Error("No items identified");
+        if (data.error) throw new Error(data.error);
+        if (!data.items || data.items.length === 0) throw new Error("No items identified");
 
         window.lastAnalyzedItems = data.items;
 
@@ -373,23 +375,23 @@ window.analyzeIngredients = async function() {
     }
 };
 
-window.selectAnalyzedItem = function(index) {
+window.selectAnalyzedItem = function (index) {
     const item = window.lastAnalyzedItems[index];
-    if(!item.base_qty) item.base_qty = item.qty; 
+    if (!item.base_qty) item.base_qty = item.qty;
     prepFoodForEdit(item, true);
 };
 
 // --- CREATE MANUAL ITEM ---
-window.saveManualItem = function() {
+window.saveManualItem = function () {
     const name = document.getElementById('manName').value;
-    if(!name) return alert("Name required");
+    if (!name) return alert("Name required");
 
     const qty = parseFloat(document.getElementById('manQty').value) || 100;
     const unit = document.getElementById('manUnit').value || 'g';
 
     const getVal = (id) => parseFloat(document.getElementById(id).value) || 0;
 
-    const factor = (unit === 'g' || unit === 'ml') ? qty / 100 : qty; 
+    const factor = (unit === 'g' || unit === 'ml') ? qty / 100 : qty;
 
     const baseCal = getVal('manKcal') / factor;
     const baseP = getVal('manProt') / factor;
@@ -410,15 +412,15 @@ window.saveManualItem = function() {
     prepFoodForEdit(item, true);
 };
 
-window.selectFoodFromSearch = function(index) {
+window.selectFoodFromSearch = function (index) {
     const item = window.lastSearchResults[index];
     prepFoodForEdit(item, true);
 };
 
 
-window.editExistingLog = function(id) {
+window.editExistingLog = function (id) {
     const log = state.logs.find(l => l.id === id);
-    if(log) {
+    if (log) {
         // Calculate the scaling factor that was used for this log
         // (e.g., if 30g was logged, factor is 0.3)
         const factor = (log.unit === 'g' || log.unit === 'ml') ? (log.qty / 100) : log.qty;
@@ -443,7 +445,7 @@ window.editExistingLog = function(id) {
             baseProtein: log.baseProtein || (log.protein / safeFactor),
             baseCarbs: log.baseCarbs || (log.carbs / safeFactor),
             baseFat: log.baseFat || (log.fat / safeFactor),
-            
+
             // Normalize cost to base unit as well
             cost: log.cost ? (log.cost / safeFactor) : 0
         };
@@ -457,7 +459,7 @@ function prepFoodForEdit(item, isNew) {
     // Stop scanner if user selects a food
     stopScanner();
 
-    const factor = item.base_qty ? (item.base_qty === 100 && (item.unit === 'g'|| item.unit==='ml') ? 1 : item.base_qty) : 1;
+    const factor = item.base_qty ? (item.base_qty === 100 && (item.unit === 'g' || item.unit === 'ml') ? 1 : item.base_qty) : 1;
 
     state.tempFood = {
         ...item,
@@ -484,7 +486,7 @@ function prepFoodForEdit(item, isNew) {
 
     // Toggle Delete Button
     document.getElementById('btnDeleteLog').classList.toggle('hidden', isNew);
-    
+
     // Hide micros by default
     document.getElementById('editMicrosArea').classList.add('hidden');
 
@@ -497,12 +499,12 @@ function openEditModal() {
     document.getElementById('editSource').innerText = state.tempFood.source || 'Database';
     document.getElementById('editQty').value = state.tempFood.qty || 100;
     document.getElementById('editUnit').value = state.tempFood.unit || 'g';
-    
+
     // NEW: Set cost values
     document.getElementById('editCost').value = state.tempFood.cost ? state.tempFood.cost.toFixed(2) : '';
     document.getElementById('editPkgPrice').value = state.tempFood.pkgPrice || '';
     document.getElementById('editPkgWeight').value = state.tempFood.pkgWeight || '';
-    
+
     updateEditPreview();
 }
 
@@ -516,11 +518,11 @@ function updateEditPreview() {
 
     const activeId = document.activeElement.id;
 
-    if (!['editKcal','editProt','editCarbs','editFat'].includes(activeId)) {
+    if (!['editKcal', 'editProt', 'editCarbs', 'editFat'].includes(activeId)) {
         document.getElementById('editKcal').value = Math.round(state.tempFood.baseCalories * factor);
-        document.getElementById('editProt').value = Math.round(state.tempFood.baseProtein * factor * 10)/10;
-        document.getElementById('editCarbs').value = Math.round(state.tempFood.baseCarbs * factor * 10)/10;
-        document.getElementById('editFat').value = Math.round(state.tempFood.baseFat * factor * 10)/10;
+        document.getElementById('editProt').value = Math.round(state.tempFood.baseProtein * factor * 10) / 10;
+        document.getElementById('editCarbs').value = Math.round(state.tempFood.baseCarbs * factor * 10) / 10;
+        document.getElementById('editFat').value = Math.round(state.tempFood.baseFat * factor * 10) / 10;
     }
 
     // NEW: Hybrid Cost Calculation Logic
@@ -538,7 +540,7 @@ function updateEditPreview() {
 
     // Update Micros
     MICRO_KEYS.forEach(key => {
-        if(activeId !== `edit_${key}`) {
+        if (activeId !== `edit_${key}`) {
             const val = (state.tempFood.micros[key] || 0) * factor;
             document.getElementById(`edit_${key}`).value = val > 0 ? (Math.round(val * 100) / 100) : '';
         }
@@ -550,8 +552,8 @@ function setupEditListeners() {
         const qty = parseFloat(document.getElementById('editQty').value) || 0;
         const unit = document.getElementById('editUnit').value;
         const factor = (unit === 'g' || unit === 'ml') ? qty / 100 : qty;
-        if(factor === 0) return;
-        
+        if (factor === 0) return;
+
         state.tempFood[key] = parseFloat(val) / factor;
     };
 
@@ -559,9 +561,9 @@ function setupEditListeners() {
         const qty = parseFloat(document.getElementById('editQty').value) || 0;
         const unit = document.getElementById('editUnit').value;
         const factor = (unit === 'g' || unit === 'ml') ? qty / 100 : qty;
-        if(factor === 0) return;
+        if (factor === 0) return;
 
-        if(!state.tempFood.micros) state.tempFood.micros = {};
+        if (!state.tempFood.micros) state.tempFood.micros = {};
         state.tempFood.micros[key] = parseFloat(val) / factor;
     };
 
@@ -578,26 +580,26 @@ function setupEditListeners() {
 
     MICRO_KEYS.forEach(key => {
         const el = document.getElementById(`edit_${key}`);
-        if(el) {
+        if (el) {
             el.addEventListener('input', (e) => updateMicroBase(key, e.target.value));
         }
     });
 }
 
 
-window.saveLog = function() {
+window.saveLog = function () {
     const qty = parseFloat(document.getElementById('editQty').value);
     const unit = document.getElementById('editUnit').value;
     const meal = document.getElementById('editMeal').value;
     const factor = (unit === 'g' || unit === 'ml') ? qty / 100 : qty;
-    
+
     state.selectedMeal = meal;
 
     // --- TIMESTAMP FIX ---
     let logTimestamp;
     const now = new Date();
     const todayStr = now.toISOString().split('T')[0];
-    
+
     if (state.currentDate !== todayStr) {
         const timePart = now.toISOString().split('T')[1];
         logTimestamp = `${state.currentDate}T${timePart}`;
@@ -605,7 +607,7 @@ window.saveLog = function() {
         now.setMilliseconds(now.getMilliseconds() + Math.floor(Math.random() * 999));
         logTimestamp = now.toISOString();
     }
-    
+
     // Read Current Input Values for accuracy
     const currentKcal = parseFloat(document.getElementById('editKcal').value) || 0;
     const currentProt = parseFloat(document.getElementById('editProt').value) || 0;
@@ -621,7 +623,7 @@ window.saveLog = function() {
     const currentMicros = {};
     MICRO_KEYS.forEach(key => {
         const val = parseFloat(document.getElementById(`edit_${key}`).value);
-        if(!isNaN(val)) currentMicros[key] = val;
+        if (!isNaN(val)) currentMicros[key] = val;
     });
 
     const safeFactor = factor === 0 ? 1 : factor;
@@ -660,16 +662,16 @@ window.saveLog = function() {
 
     localStorage.setItem('foodlog_logs', JSON.stringify(state.logs));
     closeEditModal();
-    
+
     if (state.activeTab !== 'analyze') {
         document.getElementById('addModal').classList.add('translate-y-full');
     }
-    
+
     init();
 };
 
 
-window.deleteLog = function() {
+window.deleteLog = function () {
     if (!state.tempFood || state.tempFood.isNew) return;
     if (confirm("Delete this item?")) {
         const idx = state.logs.findIndex(l => l.id === state.tempFood.id);
@@ -690,7 +692,18 @@ function toggleFavorite() {
         document.getElementById('addToFavBtn').innerHTML = '<i class="fa-regular fa-heart"></i>';
     } else {
         const meal = document.getElementById('editMeal').value;
-        const favItem = { ...state.tempFood, meal }; 
+        // Read current cost values from the edit form
+        const currentCost = parseFloat(document.getElementById('editCost').value) || 0;
+        const pkgPrice = parseFloat(document.getElementById('editPkgPrice').value) || null;
+        const pkgWeight = parseFloat(document.getElementById('editPkgWeight').value) || null;
+
+        const favItem = {
+            ...state.tempFood,
+            meal,
+            cost: currentCost,
+            pkgPrice: pkgPrice,
+            pkgWeight: pkgWeight
+        };
         state.favorites.push(favItem);
         document.getElementById('addToFavBtn').innerHTML = '<i class="fa-solid fa-heart text-red-500"></i>';
     }
@@ -711,20 +724,20 @@ function renderFavorites() {
     `).join('');
 }
 
-window.selectFav = function(index) {
+window.selectFav = function (index) {
     prepFoodForEdit(state.favorites[index], true);
 };
 
 // --- MICROS & DETAILS ---
-window.openMicros = function() {
+window.openMicros = function () {
     const dayLogs = state.logs.filter(l => l.date === state.currentDate);
     const totals = {};
-    
+
+    // Micros are already scaled when saved, so just sum them directly
     dayLogs.forEach(log => {
-        if(log.micros) {
-            const factor = (log.unit === 'g' || log.unit === 'ml') ? (log.qty / 100) : log.qty;
+        if (log.micros) {
             Object.keys(log.micros).forEach(key => {
-                totals[key] = (totals[key] || 0) + (log.micros[key] * factor);
+                totals[key] = (totals[key] || 0) + (log.micros[key] || 0);
             });
         }
     });
@@ -740,7 +753,7 @@ window.openMicros = function() {
         sugars: 'Sugars (g)', fiber: 'Fiber (g)', saturated_fat: 'Sat. Fat (g)',
         monounsaturated_fat: 'Mono. Fat (g)', polyunsaturated_fat: 'Poly. Fat (g)',
         sodium: 'Sodium (mg)', potassium: 'Potassium (mg)', chloride: 'Chloride (mg)',
-        caffeine: 'Caffeine (mg)', water: 'Water (g)',
+        caffeine: 'Caffeine (mg)', water: 'Water (ml/g)',
         vitamin_a: 'Vit A (µg)', thiamin: 'B1 Thiamin (mg)', riboflavin: 'B2 Riboflavin (mg)',
         vitamin_b6: 'Vit B6 (mg)', vitamin_b12: 'Vit B12 (µg)', biotin: 'Biotin (µg)',
         folic_acid: 'Folic Acid (µg)', niacin: 'Niacin (mg)', pantothenic_acid: 'Pantothenic (mg)',
@@ -752,7 +765,7 @@ window.openMicros = function() {
     };
 
     let html = '';
-    
+
     Object.keys(groups).forEach(groupName => {
         html += `<h4 class="text-xs font-bold text-emerald-500 uppercase tracking-wider mb-2 mt-4 first:mt-0">${groupName}</h4>`;
         html += `<div class="space-y-1">`;
@@ -760,8 +773,8 @@ window.openMicros = function() {
             const val = totals[key] || 0;
             const rdi = RDI_VALUES[key];
             let percentHtml = '';
-            
-            if(rdi) {
+
+            if (rdi) {
                 const pct = Math.round((val / rdi) * 100);
                 percentHtml = `<div class="text-[10px] ${pct >= 100 ? 'text-emerald-400' : 'text-blue-400'}">${pct}%</div>`;
             }
@@ -784,39 +797,39 @@ window.openMicros = function() {
 };
 
 // --- MEAL PLANNER ---
-window.generateMealPlan = async function() {
+window.generateMealPlan = async function () {
     const ingredients = document.getElementById('plannerInput').value;
-    if(!ingredients) return alert("Enter ingredients");
-    
+    if (!ingredients) return alert("Enter ingredients");
+
     document.getElementById('plannerInput').disabled = true;
-    
+
     try {
         const res = await fetch('/api/plan-meal', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ingredients })
         });
         const data = await res.json();
-        
+
         document.getElementById('planTitle').innerText = data.mealName;
         document.getElementById('planRecipe').innerText = data.recipe;
         document.getElementById('planGrocery').innerHTML = data.groceryList.map(i => `<li>${i}</li>`).join('');
         document.getElementById('plannerResult').classList.remove('hidden');
-    } catch(e) {
+    } catch (e) {
         alert("Failed to generate plan");
     }
     document.getElementById('plannerInput').disabled = false;
 };
 
 // --- AI COACH ---
-window.askCoach = async function() {
+window.askCoach = async function () {
     const input = document.getElementById('coachInput');
     const query = input.value;
-    if(!query) return;
+    if (!query) return;
 
     input.value = '';
     const chatArea = document.getElementById('coachChatArea');
-    
+
     // Add User Message
     chatArea.innerHTML += `
         <div class="flex justify-end mb-4">
@@ -825,7 +838,7 @@ window.askCoach = async function() {
             </div>
         </div>
     `;
-    
+
     // Add Loading Indicator
     const loadId = Math.random().toString(36);
     chatArea.innerHTML += `
@@ -840,15 +853,15 @@ window.askCoach = async function() {
     try {
         const res = await fetch('/api/coach', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ 
-                query, 
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                query,
                 logs: state.logs, // Send raw logs (server limits to recent)
-                user: state.user 
+                user: state.user
             })
         });
         const data = await res.json();
-        
+
         // Remove Loader
         document.getElementById(loadId).remove();
 
@@ -861,7 +874,10 @@ window.askCoach = async function() {
                     </div>
         `;
 
-        if(data.graphs && data.graphs.length > 0) {
+        if (data.graphs && data.graphs.length > 0) {
+            // Initialize chart storage if not exists
+            if (!window.coachCharts) window.coachCharts = [];
+
             data.graphs.forEach((g, idx) => {
                 const canvasId = `chart-${Math.random().toString(36).substr(2)}`;
                 answerHtml += `
@@ -871,7 +887,16 @@ window.askCoach = async function() {
                 `;
                 // Defer chart creation
                 setTimeout(() => {
-                    new Chart(document.getElementById(canvasId), {
+                    const canvas = document.getElementById(canvasId);
+                    if (!canvas) return;
+
+                    // Destroy old charts if we have too many (keep last 5)
+                    if (window.coachCharts.length >= 5) {
+                        const oldChart = window.coachCharts.shift();
+                        if (oldChart) oldChart.destroy();
+                    }
+
+                    const chart = new Chart(canvas, {
                         type: g.type,
                         data: {
                             labels: g.labels,
@@ -890,6 +915,7 @@ window.askCoach = async function() {
                             }
                         }
                     });
+                    window.coachCharts.push(chart);
                 }, 100);
             });
         }
@@ -900,7 +926,7 @@ window.askCoach = async function() {
     } catch (e) {
         document.getElementById(loadId).innerHTML = "Error contacting coach.";
     }
-    
+
     chatArea.scrollTop = chatArea.scrollHeight;
 };
 
@@ -908,7 +934,16 @@ window.askCoach = async function() {
 // Since I cannot add libraries easily, I'll use a very simple custom formatter
 const marked = {
     parse: (text) => {
-        return text
+        // Escape HTML to prevent XSS
+        const escapeHtml = (str) => str
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+
+        const escaped = escapeHtml(text);
+        return escaped
             .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>') // Bold
             .replace(/\n/g, '<br>') // Newlines
             .replace(/- (.*?)(<br>|$)/g, '• $1$2'); // Bullets
@@ -920,7 +955,7 @@ const marked = {
 let codeReader = null;
 let currentStream = null;
 
-window.startScanner = async function() {
+window.startScanner = async function () {
     const container = document.getElementById('scanner-container');
     container.classList.remove('hidden');
     container.innerHTML = `
@@ -937,14 +972,14 @@ window.startScanner = async function() {
     try {
         // 2. Select Camera (Environment/Back Camera)
         const videoInputDevices = await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
-        const selectedDeviceId = videoInputDevices.find(device => device.label.toLowerCase().includes('back'))?.deviceId 
-                                || videoInputDevices[0].deviceId;
+        const selectedDeviceId = videoInputDevices.find(device => device.label.toLowerCase().includes('back'))?.deviceId
+            || videoInputDevices[0].deviceId;
 
         // 3. Configure Hints
         const hints = new Map();
         const formats = [
             ZXing.BarcodeFormat.EAN_13,
-            ZXing.BarcodeFormat.EAN_8, 
+            ZXing.BarcodeFormat.EAN_8,
             ZXing.BarcodeFormat.UPC_A,
             ZXing.BarcodeFormat.UPC_E,
             ZXing.BarcodeFormat.CODE_128
@@ -954,8 +989,8 @@ window.startScanner = async function() {
 
         // 4. Start Decoding
         const controls = await codeReader.decodeFromVideoDevice(
-            selectedDeviceId, 
-            'video', 
+            selectedDeviceId,
+            'video',
             (result, err, controls) => {
                 if (result) {
                     handleScanSuccess(result.text, controls);
@@ -975,11 +1010,11 @@ window.startScanner = async function() {
             currentStream = videoElement.srcObject;
             const track = currentStream.getVideoTracks()[0];
             const capabilities = track.getCapabilities();
-            
+
             if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
                 await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
             } else if (capabilities.focusMode && capabilities.focusMode.includes('macro')) {
-                 await track.applyConstraints({ advanced: [{ focusMode: 'macro' }] });
+                await track.applyConstraints({ advanced: [{ focusMode: 'macro' }] });
             }
         }
 
@@ -990,36 +1025,41 @@ window.startScanner = async function() {
 };
 
 function handleScanSuccess(text, controls) {
-    if(controls) controls.stop();
+    if (controls) controls.stop();
     stopScanner();
 
     document.getElementById('searchInput').value = text;
-    performSearch(text);
+
+    // Only do barcode search, not text search
+    const resDiv = document.getElementById('searchResults');
+    resDiv.innerHTML = '<div class="text-center mt-4"><i class="fa-solid fa-spinner fa-spin text-emerald-500"></i> looking up barcode...</div>';
 
     fetch('/api/search', {
-         method: 'POST',
-         headers: {'Content-Type': 'application/json'},
-         body: JSON.stringify({ query: text, mode: 'barcode' })
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: text, mode: 'barcode' })
     }).then(r => r.json()).then(data => {
-        if(data.length > 0) {
+        if (data && data.length > 0) {
             prepFoodForEdit(data[0], true);
         } else {
-            alert("Product not found via Barcode.");
+            resDiv.innerHTML = '<div class="text-center text-slate-500">Barcode not found. Try text search.</div>';
         }
+    }).catch(() => {
+        resDiv.innerHTML = '<div class="text-center text-red-500">Network error.</div>';
     });
 }
 
-window.stopScanner = function() {
+window.stopScanner = function () {
     if (window.activeScannerControls) {
         window.activeScannerControls.stop();
         window.activeScannerControls = null;
     }
-    
+
     if (currentStream) {
         currentStream.getTracks().forEach(track => track.stop());
         currentStream = null;
     }
-    
+
     const container = document.getElementById('scanner-container');
     if (container) {
         container.innerHTML = '';
@@ -1027,22 +1067,22 @@ window.stopScanner = function() {
     }
 };
 
-window.manualBarcode = function() {
+window.manualBarcode = function () {
     const code = prompt("Enter barcode number:");
-    if(code) {
+    if (code) {
         stopScanner();
         document.getElementById('searchInput').value = code;
-        
+
         // Direct barcode search
         const resDiv = document.getElementById('searchResults');
         resDiv.innerHTML = '<div class="text-center mt-4"><i class="fa-solid fa-spinner fa-spin text-emerald-500"></i> checking barcode...</div>';
-        
+
         fetch('/api/search', {
-             method: 'POST',
-             headers: {'Content-Type': 'application/json'},
-             body: JSON.stringify({ query: code, mode: 'barcode' })
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: code, mode: 'barcode' })
         }).then(r => r.json()).then(data => {
-            if(data.length > 0) {
+            if (data.length > 0) {
                 prepFoodForEdit(data[0], true);
             } else {
                 resDiv.innerHTML = '<div class="text-center text-slate-500">Barcode not found in database.</div>';
@@ -1050,18 +1090,18 @@ window.manualBarcode = function() {
                 performSearch(code);
             }
         }).catch(() => {
-             resDiv.innerHTML = '<div class="text-center text-red-500">Network Error.</div>';
+            resDiv.innerHTML = '<div class="text-center text-red-500">Network Error.</div>';
         });
     }
 };
 
 // --- VISION ---
-window.triggerVision = function(type) {
+window.triggerVision = function (type) {
     if (type === 'camera') document.getElementById('visionCam').click();
     else document.getElementById('visionGal').click();
 };
 
-window.handleVision = async function(input) {
+window.handleVision = async function (input) {
     if (!input.files[0]) return;
     document.getElementById('searchResults').innerHTML = '<div class="text-center mt-10"><i class="fa-solid fa-brain fa-bounce text-emerald-500 text-2xl"></i><br>AI is analyzing photo...</div>';
 
@@ -1071,7 +1111,7 @@ window.handleVision = async function(input) {
     try {
         const res = await fetch('/api/vision', { method: 'POST', body: formData });
         const data = await res.json();
-        
+
         if (data.name) {
             const weight = data.estimated_weight_g || 100;
             const factor = weight / 100;
@@ -1120,7 +1160,7 @@ window.changeDate = (offset) => {
 window.exportJSON = () => {
     const today = new Date();
     const pastDate = new Date();
-    pastDate.setDate(today.getDate() - 7); 
+    pastDate.setDate(today.getDate() - 7);
 
     const recentLogs = state.logs.filter(l => {
         const logDate = new Date(l.date);
@@ -1129,14 +1169,14 @@ window.exportJSON = () => {
 
     const exportData = recentLogs.map((l, index) => {
         const factor = (l.unit === 'g' || l.unit === 'ml') ? (l.qty / 100) : l.qty;
-        
+
         let dateObj;
         if (l.timestamp) {
             dateObj = new Date(l.timestamp);
         } else {
-            dateObj = new Date(l.date); 
-            dateObj.setHours(12, 0, 0, 0); 
-            dateObj.setSeconds(index % 60); 
+            dateObj = new Date(l.date);
+            dateObj.setHours(12, 0, 0, 0);
+            dateObj.setSeconds(index % 60);
         }
 
         const dateString = dateObj.toISOString();
@@ -1149,7 +1189,7 @@ window.exportJSON = () => {
             carbs: Math.round(l.carbs * 10) / 10,
             fat: Math.round(l.fat * 10) / 10
         };
-        
+
         MICRO_KEYS.forEach(key => {
             if (l.micros && l.micros[key]) {
                 item[key] = Math.round((l.micros[key] * factor) * 100) / 100;
