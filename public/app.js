@@ -1247,7 +1247,8 @@ window.exportJSON = () => {
 
         MICRO_KEYS.forEach(key => {
             if (l.micros && l.micros[key]) {
-                item[key] = Math.round((l.micros[key] * factor) * 100) / 100;
+                // Micros are already stored as scaled values (actual amount eaten)
+                item[key] = Math.round(l.micros[key] * 100) / 100;
             }
         });
 
